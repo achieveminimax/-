@@ -1,0 +1,48 @@
+# Trae IDE 配置目录
+.trae/
+
+# 依赖目录
+node_modules/
+vendor/
+
+# 编译输出
+dist/
+build/
+*.exe
+*.dll
+*.so
+*.class
+
+# 日志文件
+*.log
+logs/
+
+# 环境配置文件
+.env
+.env.local
+.env.*.local
+
+# IDE 配置文件
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 测试覆盖率报告
+coverage/
+.nyc_output/
+
+# 包管理器锁定文件（根据项目需要决定是否忽略）
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
