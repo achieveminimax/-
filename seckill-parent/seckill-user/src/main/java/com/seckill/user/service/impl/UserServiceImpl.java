@@ -8,6 +8,7 @@ import com.seckill.user.dto.*;
 import com.seckill.user.entity.User;
 import com.seckill.user.mapper.UserMapper;
 import com.seckill.user.service.UserService;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -108,12 +109,6 @@ public class UserServiceImpl implements UserService {
     public UserLoginResponse login(UserLoginRequest request) {
         String account = request.getAccount();
 
-        // 检查账号是否被锁定
-        String lockKey = USER_LOCK_KEY + account;
-        if (redisUtils.hasKey(lockKey)) {
-            throw new BusinessException(ResponseCodeEnum.FORBIDDEN, "账号已锁定，请" + LOCK_TIME_MINUTES + "分钟后重试");
-        }
-
         // 根据账号查询用户（支持用户名或手机号登录）
         User user;
         if (account.matches("^1[3-9]\\d{9}$")) {
@@ -129,6 +124,12 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(ResponseCodeEnum.USER_NOT_FOUND);
         }
 
+        // 检查账号是否被锁定
+        String lockKey = USER_LOCK_KEY + user.getId();
+        if (Boolean.TRUE.equals(redisUtils.hasKey(lockKey))) {
+            throw new BusinessException(ResponseCodeEnum.FORBIDDEN, "账号已锁定，请" + LOCK_TIME_MINUTES + "分钟后重试");
+        }
+
         // 检查用户状态
         if (user.getStatus() == 0) {
             throw new BusinessException(ResponseCodeEnum.FORBIDDEN, "账号已被禁用");
@@ -137,15 +138,16 @@ public class UserServiceImpl implements UserService {
         // 验证密码
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             // 记录登录失败次数
-            recordLoginFail(account);
+            recordLoginFail(user.getId());
             throw new BusinessException(ResponseCodeEnum.BAD_REQUEST, "账号或密码错误");
         }
 
         // 登录成功，清除失败记录
-        clearLoginFail(account);
+        clearLoginFail(user.getId());
 
         // 更新最后登录时间
         user.setLoginFailCount(0);
+        user.setLockTime(LocalDateTime.now());
         userMapper.updateById(user);
 
         // 生成 Token
@@ -194,13 +196,19 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, "Refresh Token 无效或已过期");
         }
 
+        Claims claims = JwtUtils.parseToken(refreshToken);
+        Object tokenType = claims.get("type");
+        if (!"refresh".equals(tokenType)) {
+            throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, "Refresh Token 类型错误");
+        }
+
         // 检查是否在黑名单中
-        if (redisUtils.hasKey(TOKEN_BLACKLIST_KEY + refreshToken)) {
+        if (Boolean.TRUE.equals(redisUtils.hasKey(TOKEN_BLACKLIST_KEY + refreshToken))) {
             throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, "Refresh Token 已失效");
         }
 
         // 获取用户ID
-        Long userId = JwtUtils.getUserIdFromToken(refreshToken);
+        Long userId = Long.valueOf(claims.getSubject());
 
         // 验证 Redis 中的 Refresh Token 是否一致
         String storedRefreshToken = (String) redisUtils.get(USER_REFRESH_KEY + userId);
@@ -269,7 +277,16 @@ public class UserServiceImpl implements UserService {
             user.setNickname(request.getNickname());
         }
         if (StringUtils.hasText(request.getGender())) {
-            user.setGender(Integer.parseInt(request.getGender()));
+            int gender;
+            try {
+                gender = Integer.parseInt(request.getGender());
+            } catch (NumberFormatException e) {
+                throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, "gender 参数非法");
+            }
+            if (gender < 0 || gender > 2) {
+                throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, "gender 参数非法");
+            }
+            user.setGender(gender);
         }
         if (request.getBirthday() != null) {
             user.setBirthday(request.getBirthday());
@@ -319,23 +336,23 @@ public class UserServiceImpl implements UserService {
     /**
      * 记录登录失败次数
      */
-    private void recordLoginFail(String account) {
-        String failKey = LOGIN_FAIL_KEY + account;
+    private void recordLoginFail(Long userId) {
+        String failKey = LOGIN_FAIL_KEY + userId;
         Long count = redisUtils.increment(failKey, 1);
         redisUtils.expire(failKey, LOCK_TIME_MINUTES, TimeUnit.MINUTES);
 
         if (count != null && count >= MAX_LOGIN_FAIL_COUNT) {
             // 锁定账号
-            redisUtils.set(USER_LOCK_KEY + account, "1", LOCK_TIME_MINUTES, TimeUnit.MINUTES);
-            log.warn("账号被锁定: {}, 失败次数: {}", account, count);
+            redisUtils.set(USER_LOCK_KEY + userId, "1", LOCK_TIME_MINUTES, TimeUnit.MINUTES);
+            log.warn("账号被锁定: {}, 失败次数: {}", userId, count);
         }
     }
 
     /**
      * 清除登录失败记录
      */
-    private void clearLoginFail(String account) {
-        redisUtils.delete(LOGIN_FAIL_KEY + account);
+    private void clearLoginFail(Long userId) {
+        redisUtils.delete(LOGIN_FAIL_KEY + userId);
     }
 
     /**

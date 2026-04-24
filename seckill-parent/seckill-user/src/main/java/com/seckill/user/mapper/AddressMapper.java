@@ -21,7 +21,7 @@ public interface AddressMapper extends BaseMapper<Address> {
      * @param userId 用户ID
      * @return 地址列表
      */
-    @Select("SELECT * FROM t_address WHERE user_id = #{userId} ORDER BY is_default DESC, create_time DESC")
+    @Select("SELECT * FROM t_address WHERE user_id = #{userId} AND deleted = 0 ORDER BY is_default DESC, create_time DESC")
     List<Address> selectListByUserId(@Param("userId") Long userId);
 
     /**
@@ -30,7 +30,7 @@ public interface AddressMapper extends BaseMapper<Address> {
      * @param userId 用户ID
      * @return 地址数量
      */
-    @Select("SELECT COUNT(*) FROM t_address WHERE user_id = #{userId}")
+    @Select("SELECT COUNT(*) FROM t_address WHERE user_id = #{userId} AND deleted = 0")
     int countByUserId(@Param("userId") Long userId);
 
     /**
@@ -39,7 +39,7 @@ public interface AddressMapper extends BaseMapper<Address> {
      * @param userId 用户ID
      * @return 影响行数
      */
-    @Update("UPDATE t_address SET is_default = 0 WHERE user_id = #{userId}")
+    @Update("UPDATE t_address SET is_default = 0 WHERE user_id = #{userId} AND deleted = 0")
     int cancelDefaultByUserId(@Param("userId") Long userId);
 
     /**
@@ -49,6 +49,6 @@ public interface AddressMapper extends BaseMapper<Address> {
      * @param userId    用户ID
      * @return 影响行数
      */
-    @Update("UPDATE t_address SET is_default = 1 WHERE id = #{addressId} AND user_id = #{userId}")
+    @Update("UPDATE t_address SET is_default = 1 WHERE id = #{addressId} AND user_id = #{userId} AND deleted = 0")
     int setDefault(@Param("addressId") Long addressId, @Param("userId") Long userId);
 }

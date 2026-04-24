@@ -42,7 +42,7 @@ public class AddressController {
      */
     @PutMapping("/{id}")
     public Result<Void> updateAddress(@PathVariable("id") Long addressId,
-                                       @RequestBody AddressRequest request) {
+                                       @Valid @RequestBody AddressRequest request) {
         Long userId = UserContext.getCurrentUserId();
         addressService.updateAddress(userId, addressId, request);
         return Result.success();

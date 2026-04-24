@@ -128,7 +128,7 @@ public class AddressServiceImpl implements AddressService {
         if (address.getIsDefault() == 1) {
             List<Address> addressList = addressMapper.selectListByUserId(userId);
             if (!CollectionUtils.isEmpty(addressList)) {
-                Address firstAddress = addressList.get(0);
+                Address firstAddress = addressList.get(addressList.size() - 1);
                 addressMapper.setDefault(firstAddress.getId(), userId);
             }
         }

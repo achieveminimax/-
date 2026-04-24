@@ -73,7 +73,7 @@ public class UserController {
      * 更新用户信息
      */
     @PutMapping("/info")
-    public Result<Void> updateUserInfo(@RequestBody UserUpdateRequest request) {
+    public Result<Void> updateUserInfo(@Valid @RequestBody UserUpdateRequest request) {
         Long userId = UserContext.getCurrentUserId();
         userService.updateUserInfo(userId, request);
         return Result.success();

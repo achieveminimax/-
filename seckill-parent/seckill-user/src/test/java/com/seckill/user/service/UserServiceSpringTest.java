@@ -1,0 +1,248 @@
+package com.seckill.user.service;
+
+import com.seckill.common.enums.ResponseCodeEnum;
+import com.seckill.common.exception.BusinessException;
+import com.seckill.infrastructure.utils.RedisUtils;
+import com.seckill.user.dto.*;
+import com.seckill.user.entity.User;
+import com.seckill.user.mapper.UserMapper;
+import com.seckill.user.util.TestDataFactory;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+/**
+ * UserService Spring Boot 集成测试
+ * 使用 @MockBean 替代 @Mock 解决 Java 模块系统问题
+ */
+@SpringBootTest
+@ActiveProfiles("test")
+@DisplayName("UserService Spring Boot 集成测试")
+class UserServiceSpringTest {
+
+    @Autowired
+    private UserService userService;
+
+    @MockBean
+    private UserMapper userMapper;
+
+    @MockBean
+    private BCryptPasswordEncoder passwordEncoder;
+
+    @MockBean
+    private RedisUtils redisUtils;
+
+    // ==================== 注册测试 ====================
+
+    @Test
+    @DisplayName("注册失败 - 密码不一致")
+    void register_PasswordMismatch() {
+        // Given
+        UserRegisterRequest request = TestDataFactory.createUserRegisterRequest();
+        request.setConfirmPassword("DifferentPassword");
+
+        // When & Then
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            userService.register(request);
+        });
+
+        assertEquals(ResponseCodeEnum.PARAM_ERROR.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("密码不一致"));
+    }
+
+    @Test
+    @DisplayName("注册失败 - 用户名已存在")
+    void register_UsernameExists() {
+        // Given
+        UserRegisterRequest request = TestDataFactory.createUserRegisterRequest();
+        
+        when(userMapper.countByUsername(request.getUsername())).thenReturn(1);
+
+        // When & Then
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            userService.register(request);
+        });
+
+        assertEquals(ResponseCodeEnum.USERNAME_EXISTS.getCode(), exception.getCode());
+        verify(userMapper).countByUsername(request.getUsername());
+    }
+
+    @Test
+    @DisplayName("注册失败 - 手机号已存在")
+    void register_PhoneExists() {
+        // Given
+        UserRegisterRequest request = TestDataFactory.createUserRegisterRequest();
+        
+        when(userMapper.countByUsername(request.getUsername())).thenReturn(0);
+        when(userMapper.countByPhone(request.getPhone())).thenReturn(1);
+
+        // When & Then
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            userService.register(request);
+        });
+
+        assertEquals(ResponseCodeEnum.PHONE_EXISTS.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("注册失败 - 验证码错误")
+    void register_InvalidVerifyCode() {
+        // Given
+        UserRegisterRequest request = TestDataFactory.createUserRegisterRequest();
+        request.setVerifyCode("123456");
+
+        // When & Then
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            userService.register(request);
+        });
+
+        assertEquals(ResponseCodeEnum.VERIFY_CODE_ERROR.getCode(), exception.getCode());
+    }
+
+    // ==================== 登录测试 ====================
+
+    @Test
+    @DisplayName("登录失败 - 用户不存在")
+    void login_UserNotFound() {
+        // Given
+        UserLoginRequest request = TestDataFactory.createUserLoginRequest();
+        
+        when(userMapper.selectByUsername(request.getAccount())).thenReturn(null);
+
+        // When & Then
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            userService.login(request);
+        });
+
+        assertEquals(ResponseCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("登录失败 - 账号被禁用")
+    void login_AccountDisabled() {
+        // Given
+        UserLoginRequest request = TestDataFactory.createUserLoginRequest();
+        User user = TestDataFactory.createUser();
+        user.setStatus(0); // 禁用状态
+        
+        when(userMapper.selectByUsername(request.getAccount())).thenReturn(user);
+        when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
+
+        // When & Then
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            userService.login(request);
+        });
+
+        assertEquals(ResponseCodeEnum.FORBIDDEN.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("账号已被禁用"));
+    }
+
+    // ==================== 个人信息管理测试 ====================
+
+    @Test
+    @DisplayName("获取用户信息成功")
+    void getUserInfo_Success() {
+        // Given
+        Long userId = 1L;
+        User user = TestDataFactory.createUser();
+        
+        when(userMapper.selectById(userId)).thenReturn(user);
+
+        // When
+        UserInfoResponse response = userService.getUserInfo(userId);
+
+        // Then
+        assertNotNull(response);
+        assertEquals(userId, response.getUserId());
+        assertEquals(user.getUsername(), response.getUsername());
+        assertEquals(user.getNickname(), response.getNickname());
+        assertTrue(response.getPhone().contains("****")); // 验证手机号脱敏
+    }
+
+    @Test
+    @DisplayName("获取用户信息失败 - 用户不存在")
+    void getUserInfo_UserNotFound() {
+        // Given
+        Long userId = 999L;
+        
+        when(userMapper.selectById(userId)).thenReturn(null);
+
+        // When & Then
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            userService.getUserInfo(userId);
+        });
+
+        assertEquals(ResponseCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("更新用户信息成功")
+    void updateUserInfo_Success() {
+        // Given
+        Long userId = 1L;
+        UserUpdateRequest request = TestDataFactory.createUserUpdateRequest();
+        User user = TestDataFactory.createUser();
+        
+        when(userMapper.selectById(userId)).thenReturn(user);
+        when(userMapper.updateById(any(User.class))).thenReturn(1);
+
+        // When
+        assertDoesNotThrow(() -> userService.updateUserInfo(userId, request));
+
+        // Then
+        assertEquals(request.getNickname(), user.getNickname());
+        assertEquals(Integer.parseInt(request.getGender()), user.getGender());
+        assertEquals(request.getBirthday(), user.getBirthday());
+        assertEquals(request.getEmail(), user.getEmail());
+        verify(userMapper).updateById(user);
+    }
+
+    @Test
+    @DisplayName("修改密码失败 - 旧密码错误")
+    void updatePassword_WrongOldPassword() {
+        // Given
+        Long userId = 1L;
+        PasswordUpdateRequest request = TestDataFactory.createPasswordUpdateRequestWrongOld();
+        User user = TestDataFactory.createUser();
+        
+        when(userMapper.selectById(userId)).thenReturn(user);
+        when(passwordEncoder.matches(request.getOldPassword(), user.getPassword())).thenReturn(false);
+
+        // When & Then
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            userService.updatePassword(userId, request);
+        });
+
+        assertEquals(ResponseCodeEnum.BAD_REQUEST.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("原密码错误"));
+    }
+
+    @Test
+    @DisplayName("修改密码失败 - 新密码与旧密码相同")
+    void updatePassword_SameAsOld() {
+        // Given
+        Long userId = 1L;
+        PasswordUpdateRequest request = TestDataFactory.createPasswordUpdateRequest();
+        User user = TestDataFactory.createUser();
+        
+        when(userMapper.selectById(userId)).thenReturn(user);
+        when(passwordEncoder.matches(request.getOldPassword(), user.getPassword())).thenReturn(true);
+        when(passwordEncoder.matches(request.getNewPassword(), user.getPassword())).thenReturn(true);
+
+        // When & Then
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            userService.updatePassword(userId, request);
+        });
+
+        assertEquals(ResponseCodeEnum.PARAM_ERROR.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("新密码不能与旧密码相同"));
+    }
+}
