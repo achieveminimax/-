@@ -1,0 +1,23 @@
+.mobile-layout {
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.mobile-nav-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--color-white);
+  border-bottom: 1px solid var(--color-bg);
+}
+
+.mobile-nav-bar .adm-nav-bar {
+  --adm-color-text: var(--color-title);
+  --adm-font-size-main: var(--font-size-h4);
+}
+
+.mobile-content {
+  min-height: 100vh;
+}

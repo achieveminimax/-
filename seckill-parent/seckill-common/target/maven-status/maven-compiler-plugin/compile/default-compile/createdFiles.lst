@@ -7,6 +7,7 @@ com/seckill/common/dto/PageRequest.class
 com/seckill/common/exception/BusinessException.class
 com/seckill/common/result/Result.class
 com/seckill/common/Result.class
+com/seckill/common/utils/UserContext.class
 com/seckill/common/enums/PayStatusEnum.class
 com/seckill/common/ResponseCodeEnum.class
 com/seckill/common/utils/JwtUtils.class

@@ -1,0 +1,31 @@
+.orders-page {
+  min-height: calc(100vh - var(--header-height) - var(--tabbar-height));
+}
+
+.order-tabs {
+  background: var(--color-white);
+  position: sticky;
+  top: var(--header-height);
+  z-index: 10;
+}
+
+.order-tabs .adm-tabs-header {
+  border-bottom: 1px solid var(--color-bg);
+}
+
+.order-tabs .adm-tabs-tab {
+  font-size: var(--font-size-body);
+}
+
+.order-tabs .adm-tabs-tab-active {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.order-tabs .adm-tabs-tab-line {
+  background: var(--color-primary);
+}
+
+.order-list {
+  padding: var(--spacing-md);
+}

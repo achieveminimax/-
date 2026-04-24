@@ -1,8 +1,11 @@
 package com.seckill.infrastructure.config;
 
+import com.seckill.infrastructure.interceptor.JwtAuthInterceptor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
@@ -10,7 +13,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  */
 @Slf4j
 @Configuration
+@RequiredArgsConstructor
 public class WebMvcConfig implements WebMvcConfigurer {
+
+    private final JwtAuthInterceptor jwtAuthInterceptor;
 
     /**
      * 跨域配置
@@ -18,19 +24,29 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                // 允许的前端域名
                 .allowedOriginPatterns("*")
-                // 允许的请求方法
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
-                // 允许的请求头
                 .allowedHeaders("*")
-                // 暴露的响应头
                 .exposedHeaders("Authorization", "Content-Disposition")
-                // 是否允许携带凭证（Cookie）
                 .allowCredentials(true)
-                // 预检请求缓存时间（秒）
                 .maxAge(3600);
 
         log.info("CORS 跨域配置完成");
+    }
+
+    /**
+     * 注册拦截器
+     */
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(jwtAuthInterceptor)
+                .addPathPatterns("/api/**")
+                .excludePathPatterns(
+                        "/api/user/register",
+                        "/api/user/login",
+                        "/api/user/refresh-token"
+                );
+
+        log.info("JWT 认证拦截器注册完成");
     }
 }

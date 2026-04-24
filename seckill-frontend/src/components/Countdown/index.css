@@ -1,0 +1,7 @@
+.countdown {
+  font-family: var(--font-family-number);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  font-size: var(--font-size-h4);
+  letter-spacing: 1px;
+}

@@ -1,0 +1,132 @@
+.home-page {
+  padding-bottom: var(--spacing-lg);
+}
+
+.home-search {
+  padding: var(--spacing-md);
+  background: var(--color-white);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.home-search .adm-search-bar {
+  --adm-color-primary: var(--color-primary);
+}
+
+.home-banner {
+  height: 150px;
+  margin: 0 var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.banner-item {
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-lg);
+}
+
+.banner-content {
+  color: var(--color-white);
+}
+
+.banner-content h3 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.banner-content p {
+  font-size: var(--font-size-caption);
+  opacity: 0.9;
+  margin-bottom: var(--spacing-sm);
+}
+
+.banner-countdown {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-caption);
+  background: rgba(255, 255, 255, 0.2);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  width: fit-content;
+}
+
+.banner-countdown .countdown {
+  color: var(--color-white);
+  font-size: var(--font-size-caption);
+}
+
+.home-section {
+  margin-bottom: var(--spacing-lg);
+  padding: 0 var(--spacing-md);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.section-title {
+  font-size: var(--font-size-h4);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-title);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.fire-icon {
+  color: var(--color-primary);
+}
+
+.view-more {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.seckill-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+}
+
+.hot-goods-card {
+  background: var(--color-white);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.hot-goods-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.hot-goods-card h4 {
+  font-size: var(--font-size-body);
+  color: var(--color-title);
+  padding: var(--spacing-sm);
+  margin: 0;
+  min-height: 44px;
+}
+
+.hot-goods-price {
+  font-size: var(--font-size-h4);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  padding: 0 var(--spacing-sm) var(--spacing-sm);
+  font-family: var(--font-family-number);
+}

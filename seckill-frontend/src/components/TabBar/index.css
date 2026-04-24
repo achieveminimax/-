@@ -1,0 +1,21 @@
+.tab-bar-wrapper {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--color-white);
+  border-top: 1px solid var(--color-bg);
+  z-index: 100;
+}
+
+.tab-bar-wrapper .adm-tab-bar {
+  --adm-color-primary: var(--color-primary);
+}
+
+.tab-bar-wrapper .adm-tab-bar-item {
+  color: var(--color-text-secondary);
+}
+
+.tab-bar-wrapper .adm-tab-bar-item-active {
+  color: var(--color-primary);
+}

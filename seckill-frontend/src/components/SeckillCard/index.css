@@ -1,0 +1,89 @@
+.seckill-card {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.seckill-card-image {
+  position: relative;
+  width: 100%;
+  padding-top: 100%;
+  background: var(--color-bg);
+}
+
+.seckill-card-image img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.seckill-card-tag {
+  position: absolute;
+  top: var(--spacing-sm);
+  left: var(--spacing-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+  color: var(--color-white);
+  font-size: var(--font-size-small);
+  border-radius: var(--radius-sm);
+}
+
+.seckill-card-content {
+  padding: var(--spacing-md);
+}
+
+.seckill-card-title {
+  font-size: var(--font-size-body);
+  color: var(--color-title);
+  margin-bottom: var(--spacing-sm);
+  min-height: 40px;
+}
+
+.seckill-card-price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.seckill-price {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  font-family: var(--font-family-number);
+}
+
+.original-price {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+}
+
+.seckill-card-progress {
+  margin-bottom: var(--spacing-md);
+}
+
+.progress-text {
+  display: block;
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-xs);
+}
+
+.seckill-card-btn {
+  --background-color: var(--color-primary) !important;
+  --border-color: var(--color-primary) !important;
+  font-weight: var(--font-weight-medium);
+}
+
+.seckill-card-btn.adm-button-default {
+  --background-color: var(--color-bg) !important;
+  --text-color: var(--color-text-secondary) !important;
+}

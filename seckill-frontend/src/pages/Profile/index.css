@@ -1,0 +1,108 @@
+.profile-page {
+  padding-bottom: var(--spacing-lg);
+}
+
+.profile-header {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+  padding: var(--spacing-xl) var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  color: var(--color-white);
+}
+
+.user-avatar {
+  --size: 64px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  font-size: 24px;
+}
+
+.user-detail {
+  flex: 1;
+}
+
+.username {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--spacing-xs);
+}
+
+.phone {
+  font-size: var(--font-size-caption);
+  opacity: 0.9;
+}
+
+.arrow {
+  font-size: var(--font-size-h4);
+  opacity: 0.7;
+}
+
+.profile-section {
+  background: var(--color-white);
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-md);
+}
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-title);
+  margin-bottom: var(--spacing-md);
+}
+
+.view-all {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-normal);
+}
+
+.order-shortcuts .shortcut-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+}
+
+.shortcut-icon {
+  font-size: 24px;
+}
+
+.shortcut-label {
+  font-size: var(--font-size-caption);
+  color: var(--color-text);
+}
+
+.service-grid .service-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  cursor: pointer;
+}
+
+.service-icon {
+  font-size: 24px;
+  color: var(--color-primary);
+}
+
+.service-label {
+  font-size: var(--font-size-caption);
+  color: var(--color-text);
+}
+
+.logout-btn {
+  text-align: center;
+  padding: var(--spacing-md);
+  color: var(--color-error);
+  font-size: var(--font-size-body);
+  cursor: pointer;
+}
