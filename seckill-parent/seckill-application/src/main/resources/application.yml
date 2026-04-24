@@ -1,33 +1,67 @@
-# ======================================================== 
-# Spring Boot 主配置文件
-# ======================================================== 
-
-spring:
-  profiles:
-    active: dev
-
-  # 导入基础设施配置
-  config:
-    import: classpath:application-infrastructure.yml
-
-# 服务器配置
+# 应用配置
 server:
   port: 8080
   servlet:
     context-path: /
+  tomcat:
+    threads:
+      max: 500
+      min-spare: 50
+    connection-timeout: 20000
+
+# Spring 配置
+spring:
+  application:
+    name: seckill-system
+  profiles:
+    active: dev
+  main:
+    allow-bean-definition-overriding: true
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    default-property-inclusion: non_null
 
 # 日志配置
 logging:
   level:
-    root: info
-    com.seckill: debug
-    org.springframework.web: info
+    root: INFO
+    com.seckill: DEBUG
+    org.springframework.web: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"
+  file:
+    name: logs/seckill-system.log
 
-# Knife4j 配置
+# Knife4j API 文档配置
 knife4j:
   enable: true
   setting:
     language: zh_cn
     swagger-model-name: 实体类列表
+  openapi:
+    title: 电商秒杀系统 API 文档
+    description: |
+      ## 项目介绍
+      电商秒杀系统是一个高并发场景下的电商项目，采用 Spring Boot + MyBatis-Plus + Redis + RabbitMQ 技术栈。
+      
+      ## 主要功能
+      - 用户注册/登录/个人信息管理
+      - 商品浏览/分类管理
+      - 秒杀活动/抢购核心逻辑
+      - 订单管理/超时取消
+      - 模拟支付
+      
+      ## 技术亮点
+      - Redis 预扣库存 + 消息队列异步下单
+      - 分布式锁防止超卖
+      - 接口限流防刷
+      - 延迟队列实现订单超时取消
+    version: v1.0.0
+    contact:
+      name: Seckill Team
+      email: support@seckill.com
+    license:
+      name: Apache 2.0
+      url: https://www.apache.org/licenses/LICENSE-2.0

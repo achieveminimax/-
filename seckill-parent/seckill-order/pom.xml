@@ -12,32 +12,50 @@
 
     <artifactId>seckill-order</artifactId>
     <name>seckill-order</name>
-    <description>订单模块 - 订单管理、支付模拟、超时取消</description>
+    <description>订单模块 - 订单创建、管理、超时取消</description>
 
     <dependencies>
-        <!-- 依赖 infrastructure 模块 -->
+        <!-- Common Module -->
+        <dependency>
+            <groupId>com.seckill</groupId>
+            <artifactId>seckill-common</artifactId>
+        </dependency>
+
+        <!-- Infrastructure Module -->
         <dependency>
             <groupId>com.seckill</groupId>
             <artifactId>seckill-infrastructure</artifactId>
         </dependency>
 
-        <!-- 依赖 user 模块 -->
+        <!-- Spring Boot Web -->
         <dependency>
-            <groupId>com.seckill</groupId>
-            <artifactId>seckill-user</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- 依赖 goods 模块 -->
+        <!-- Spring Boot AMQP -->
         <dependency>
-            <groupId>com.seckill</groupId>
-            <artifactId>seckill-goods</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
 
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <scope>provided</scope>
+        </dependency>
+
+        <!-- MapStruct -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

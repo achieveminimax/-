@@ -1,54 +1,78 @@
 package com.seckill.common.utils;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Random;
+
 /**
- * Twitter Snowflake 算法实现
- * 用于生成全局唯一ID
- *
+ * 雪花算法 ID 生成器
+ * <p>
  * 结构：
- * 1位符号位 + 41位时间戳 + 10位机器ID + 12位序列号 = 64位Long
- *
- * @author seckill
+ * 0 - 0000000000 0000000000 0000000000 0000000000 0 - 00000 - 00000 - 000000000000
+ * 1位标识位 + 41位时间戳 + 5位数据中心ID + 5位机器ID + 12位序列号
  */
 public class SnowflakeIdWorker {
 
-    // ==================== 常量定义 ====================
+    // ============================== 常量 ==============================
 
     /**
      * 起始时间戳（2024-01-01 00:00:00）
      */
-    private static final long START_TIMESTAMP = 1704067200000L;
+    private final long START_TIMESTAMP = 1704067200000L;
 
     /**
-     * 机器ID所占位数
+     * 数据中心ID占用的位数
      */
-    private static final long WORKER_ID_BITS = 10L;
+    private final long DATA_CENTER_ID_BITS = 5L;
 
     /**
-     * 序列号所占位数
+     * 机器ID占用的位数
      */
-    private static final long SEQUENCE_BITS = 12L;
+    private final long WORKER_ID_BITS = 5L;
 
     /**
-     * 机器ID最大值（1023）
+     * 序列号占用的位数
      */
-    private static final long MAX_WORKER_ID = ~(-1L << WORKER_ID_BITS);
+    private final long SEQUENCE_BITS = 12L;
 
     /**
-     * 序列号最大值（4095）
+     * 最大数据中心ID（31）
      */
-    private static final long MAX_SEQUENCE = ~(-1L << SEQUENCE_BITS);
+    private final long MAX_DATA_CENTER_ID = ~(-1L << DATA_CENTER_ID_BITS);
+
+    /**
+     * 最大机器ID（31）
+     */
+    private final long MAX_WORKER_ID = ~(-1L << WORKER_ID_BITS);
+
+    /**
+     * 最大序列号（4095）
+     */
+    private final long MAX_SEQUENCE = ~(-1L << SEQUENCE_BITS);
 
     /**
      * 机器ID左移位数
      */
-    private static final long WORKER_ID_SHIFT = SEQUENCE_BITS;
+    private final long WORKER_ID_SHIFT = SEQUENCE_BITS;
+
+    /**
+     * 数据中心ID左移位数
+     */
+    private final long DATA_CENTER_ID_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS;
 
     /**
      * 时间戳左移位数
      */
-    private static final long TIMESTAMP_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS;
+    private final long TIMESTAMP_LEFT_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS + DATA_CENTER_ID_BITS;
 
-    // ==================== 成员变量 ====================
+    // ============================== 成员变量 ==============================
+
+    /**
+     * 数据中心ID
+     */
+    private final long dataCenterId;
 
     /**
      * 机器ID
@@ -65,7 +89,7 @@ public class SnowflakeIdWorker {
      */
     private long lastTimestamp = -1L;
 
-    // ==================== 单例模式 ====================
+    // ============================== 单例 ==============================
 
     private static volatile SnowflakeIdWorker instance;
 
@@ -76,8 +100,7 @@ public class SnowflakeIdWorker {
         if (instance == null) {
             synchronized (SnowflakeIdWorker.class) {
                 if (instance == null) {
-                    // 默认机器ID为0，生产环境应从配置中心获取
-                    instance = new SnowflakeIdWorker(0);
+                    instance = new SnowflakeIdWorker();
                 }
             }
         }
@@ -85,49 +108,52 @@ public class SnowflakeIdWorker {
     }
 
     /**
-     * 获取指定机器ID的实例
+     * 获取指定数据中心ID和机器ID的实例
      */
-    public static SnowflakeIdWorker getInstance(long workerId) {
-        if (instance == null) {
-            synchronized (SnowflakeIdWorker.class) {
-                if (instance == null) {
-                    instance = new SnowflakeIdWorker(workerId);
-                }
-            }
-        }
-        return instance;
+    public static SnowflakeIdWorker getInstance(long dataCenterId, long workerId) {
+        return new SnowflakeIdWorker(dataCenterId, workerId);
     }
 
-    // ==================== 构造方法 ====================
+    // ============================== 构造方法 ==============================
+
+    /**
+     * 默认构造方法（自动生成数据中心ID和机器ID）
+     */
+    private SnowflakeIdWorker() {
+        this.dataCenterId = generateDataCenterId();
+        this.workerId = generateWorkerId();
+    }
 
     /**
      * 构造方法
      *
-     * @param workerId 机器ID (0-1023)
+     * @param dataCenterId 数据中心ID (0-31)
+     * @param workerId     机器ID (0-31)
      */
-    private SnowflakeIdWorker(long workerId) {
-        if (workerId < 0 || workerId > MAX_WORKER_ID) {
-            throw new IllegalArgumentException(
-                    String.format("机器ID必须在 0-%d 之间", MAX_WORKER_ID));
+    private SnowflakeIdWorker(long dataCenterId, long workerId) {
+        if (dataCenterId > MAX_DATA_CENTER_ID || dataCenterId < 0) {
+            throw new IllegalArgumentException("数据中心ID必须在0-31之间");
         }
+        if (workerId > MAX_WORKER_ID || workerId < 0) {
+            throw new IllegalArgumentException("机器ID必须在0-31之间");
+        }
+        this.dataCenterId = dataCenterId;
         this.workerId = workerId;
     }
 
-    // ==================== 核心方法 ====================
+    // ============================== 核心方法 ==============================
 
     /**
      * 生成下一个ID（线程安全）
      *
-     * @return 全局唯一ID
+     * @return 唯一ID
      */
     public synchronized long nextId() {
-        long timestamp = currentTimeMillis();
+        long timestamp = getCurrentTimestamp();
 
-        // 如果当前时间小于上次生成时间，说明时钟回拨，抛出异常
+        // 如果当前时间小于上次生成ID的时间，说明系统时钟回退
         if (timestamp < lastTimestamp) {
-            throw new RuntimeException(
-                    String.format("时钟回拨，拒绝生成ID。上次时间戳：%d，当前时间戳：%d",
-                            lastTimestamp, timestamp));
+            throw new RuntimeException("系统时钟回退，拒绝生成ID");
         }
 
         // 如果是同一时间生成的，则进行序列号累加
@@ -135,51 +161,95 @@ public class SnowflakeIdWorker {
             sequence = (sequence + 1) & MAX_SEQUENCE;
             // 序列号溢出，等待下一毫秒
             if (sequence == 0) {
-                timestamp = tilNextMillis(lastTimestamp);
+                timestamp = getNextTimestamp(lastTimestamp);
             }
         } else {
-            // 时间戳改变，重置序列号
+            // 时间戳改变，序列号重置
             sequence = 0L;
         }
 
         lastTimestamp = timestamp;
 
         // 组合ID
-        return ((timestamp - START_TIMESTAMP) << TIMESTAMP_SHIFT)
+        return ((timestamp - START_TIMESTAMP) << TIMESTAMP_LEFT_SHIFT)
+                | (dataCenterId << DATA_CENTER_ID_SHIFT)
                 | (workerId << WORKER_ID_SHIFT)
                 | sequence;
     }
 
     /**
-     * 等待下一毫秒
+     * 生成订单号（带日期前缀）
+     *
+     * @return 订单号
      */
-    private long tilNextMillis(long lastTimestamp) {
-        long timestamp = currentTimeMillis();
+    public String generateOrderNo() {
+        String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        long id = nextId();
+        return "SEK" + dateStr + String.format("%012d", id % 1000000000000L);
+    }
+
+    /**
+     * 生成支付流水号
+     *
+     * @return 支付流水号
+     */
+    public String generatePayNo() {
+        String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        long id = nextId();
+        return "PAY" + dateStr + String.format("%012d", id % 1000000000000L);
+    }
+
+    // ============================== 私有方法 ==============================
+
+    /**
+     * 获取当前时间戳
+     */
+    private long getCurrentTimestamp() {
+        return System.currentTimeMillis();
+    }
+
+    /**
+     * 获取下一个时间戳
+     */
+    private long getNextTimestamp(long lastTimestamp) {
+        long timestamp = getCurrentTimestamp();
         while (timestamp <= lastTimestamp) {
-            timestamp = currentTimeMillis();
+            timestamp = getCurrentTimestamp();
         }
         return timestamp;
     }
 
     /**
-     * 获取当前时间戳
+     * 生成数据中心ID（基于IP地址）
      */
-    private long currentTimeMillis() {
-        return System.currentTimeMillis();
+    private long generateDataCenterId() {
+        try {
+            InetAddress ip = InetAddress.getLocalHost();
+            String hostAddress = ip.getHostAddress();
+            // 取IP最后一段对32取模
+            String[] parts = hostAddress.split("\\.");
+            if (parts.length == 4) {
+                return Long.parseLong(parts[3]) % (MAX_DATA_CENTER_ID + 1);
+            }
+        } catch (UnknownHostException e) {
+            // 使用随机数
+        }
+        return new Random().nextInt((int) (MAX_DATA_CENTER_ID + 1));
     }
 
     /**
-     * 生成订单号（带前缀）
+     * 生成机器ID（基于进程ID）
      */
-    public static String generateOrderNo() {
-        return "ORD" + getInstance().nextId();
+    private long generateWorkerId() {
+        try {
+            String processName = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
+            // 进程ID对32取模
+            if (processName.contains("@")) {
+                return Long.parseLong(processName.split("@")[0]) % (MAX_WORKER_ID + 1);
+            }
+        } catch (Exception e) {
+            // 使用随机数
+        }
+        return new Random().nextInt((int) (MAX_WORKER_ID + 1));
     }
-
-    /**
-     * 生成支付流水号（带前缀）
-     */
-    public static String generatePayNo() {
-        return "PAY" + getInstance().nextId();
-    }
-
 }

@@ -15,17 +15,41 @@
     <description>商品模块 - 商品管理、分类管理</description>
 
     <dependencies>
-        <!-- 依赖 infrastructure 模块 -->
+        <!-- Common Module -->
+        <dependency>
+            <groupId>com.seckill</groupId>
+            <artifactId>seckill-common</artifactId>
+        </dependency>
+
+        <!-- Infrastructure Module -->
         <dependency>
             <groupId>com.seckill</groupId>
             <artifactId>seckill-infrastructure</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Web -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <scope>provided</scope>
+        </dependency>
+
+        <!-- MapStruct -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

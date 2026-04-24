@@ -12,48 +12,51 @@
 
     <artifactId>seckill-application</artifactId>
     <name>seckill-application</name>
-    <description>应用启动入口 - 聚合所有模块</description>
+    <description>应用启动入口 - 整合所有模块</description>
     <packaging>jar</packaging>
 
     <dependencies>
-        <!-- 依赖 user 模块 -->
+        <!-- Business Modules -->
         <dependency>
             <groupId>com.seckill</groupId>
             <artifactId>seckill-user</artifactId>
         </dependency>
-
-        <!-- 依赖 goods 模块 -->
         <dependency>
             <groupId>com.seckill</groupId>
             <artifactId>seckill-goods</artifactId>
         </dependency>
-
-        <!-- 依赖 seckill 模块 -->
         <dependency>
             <groupId>com.seckill</groupId>
             <artifactId>seckill-seckill</artifactId>
         </dependency>
-
-        <!-- 依赖 order 模块 -->
         <dependency>
             <groupId>com.seckill</groupId>
             <artifactId>seckill-order</artifactId>
         </dependency>
-
-        <!-- 依赖 admin 模块 -->
         <dependency>
             <groupId>com.seckill</groupId>
             <artifactId>seckill-admin</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Starter -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Web -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <scope>provided</scope>
         </dependency>
 
-        <!-- Spring Boot Test -->
+        <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

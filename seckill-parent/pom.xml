@@ -10,7 +10,7 @@
     <packaging>pom</packaging>
 
     <name>seckill-parent</name>
-    <description>电商秒杀系统 - 父项目</description>
+    <description>电商秒杀系统 - 父模块</description>
 
     <modules>
         <module>seckill-common</module>
@@ -28,23 +28,34 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <!-- Spring Boot 版本 -->
+        <!-- Spring Boot -->
         <spring-boot.version>3.2.5</spring-boot.version>
 
-        <!-- 数据库相关 -->
-        <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <!-- MyBatis-Plus -->
+        <mybatis-plus.version>3.5.6</mybatis-plus.version>
+
+        <!-- Database -->
         <mysql-connector.version>8.0.33</mysql-connector.version>
+        <druid.version>1.2.22</druid.version>
 
-        <!-- 工具类 -->
-        <lombok.version>1.18.30</lombok.version>
-        <hutool.version>5.8.25</hutool.version>
-        <jjwt.version>0.12.3</jjwt.version>
 
-        <!-- API 文档 -->
-        <knife4j.version>4.4.0</knife4j.version>
 
-        <!-- 其他 -->
-        <fastjson2.version>2.0.46</fastjson2.version>
+        <!-- JWT -->
+        <jjwt.version>0.12.5</jjwt.version>
+
+        <!-- JSON -->
+        <fastjson2.version>2.0.49</fastjson2.version>
+
+        <!-- Tools -->
+        <hutool.version>5.8.27</hutool.version>
+        <lombok.version>1.18.32</lombok.version>
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
+
+        <!-- API Docs -->
+        <knife4j.version>4.5.0</knife4j.version>
+
+        <!-- Testing -->
+        <junit.version>5.10.2</junit.version>
     </properties>
 
     <dependencyManagement>
@@ -61,30 +72,25 @@
             <!-- MyBatis-Plus -->
             <dependency>
                 <groupId>com.baomidou</groupId>
-                <artifactId>mybatis-plus-boot-starter</artifactId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
                 <version>${mybatis-plus.version}</version>
             </dependency>
 
-            <!-- MySQL 驱动 -->
+            <!-- MySQL -->
             <dependency>
-                <groupId>mysql</groupId>
-                <artifactId>mysql-connector-java</artifactId>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
                 <version>${mysql-connector.version}</version>
             </dependency>
 
-            <!-- Lombok -->
+            <!-- Druid -->
             <dependency>
-                <groupId>org.projectlombok</groupId>
-                <artifactId>lombok</artifactId>
-                <version>${lombok.version}</version>
+                <groupId>com.alibaba</groupId>
+                <artifactId>druid-spring-boot-3-starter</artifactId>
+                <version>${druid.version}</version>
             </dependency>
 
-            <!-- Hutool 工具库 -->
-            <dependency>
-                <groupId>cn.hutool</groupId>
-                <artifactId>hutool-all</artifactId>
-                <version>${hutool.version}</version>
-            </dependency>
+
 
             <!-- JWT -->
             <dependency>
@@ -96,18 +102,13 @@
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-impl</artifactId>
                 <version>${jjwt.version}</version>
+                <scope>runtime</scope>
             </dependency>
             <dependency>
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-jackson</artifactId>
                 <version>${jjwt.version}</version>
-            </dependency>
-
-            <!-- Knife4j API 文档 -->
-            <dependency>
-                <groupId>com.github.xiaoymin</groupId>
-                <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
-                <version>${knife4j.version}</version>
+                <scope>runtime</scope>
             </dependency>
 
             <!-- Fastjson2 -->
@@ -117,7 +118,42 @@
                 <version>${fastjson2.version}</version>
             </dependency>
 
-            <!-- 内部模块依赖 -->
+            <!-- Hutool -->
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
+            </dependency>
+
+            <!-- Lombok -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <!-- MapStruct -->
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <!-- Knife4j -->
+            <dependency>
+                <groupId>com.github.xiaoymin</groupId>
+                <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+                <version>${knife4j.version}</version>
+            </dependency>
+
+            <!-- Internal Modules -->
             <dependency>
                 <groupId>com.seckill</groupId>
                 <artifactId>seckill-common</artifactId>
@@ -163,6 +199,14 @@
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring-boot.version}</version>
+                    <configuration>
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -177,38 +221,16 @@
                                 <artifactId>lombok</artifactId>
                                 <version>${lombok.version}</version>
                             </path>
+                            <path>
+                                <groupId>org.mapstruct</groupId>
+                                <artifactId>mapstruct-processor</artifactId>
+                                <version>${mapstruct.version}</version>
+                            </path>
                         </annotationProcessorPaths>
                     </configuration>
                 </plugin>
             </plugins>
         </pluginManagement>
     </build>
-
-    <profiles>
-        <!-- 开发环境 -->
-        <profile>
-            <id>dev</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <properties>
-                <profiles.active>dev</profiles.active>
-            </properties>
-        </profile>
-        <!-- 测试环境 -->
-        <profile>
-            <id>test</id>
-            <properties>
-                <profiles.active>test</profiles.active>
-            </properties>
-        </profile>
-        <!-- 生产环境 -->
-        <profile>
-            <id>prod</id>
-            <properties>
-                <profiles.active>prod</profiles.active>
-            </properties>
-        </profile>
-    </profiles>
 
 </project>

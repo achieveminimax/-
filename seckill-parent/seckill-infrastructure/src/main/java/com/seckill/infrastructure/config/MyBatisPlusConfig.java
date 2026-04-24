@@ -14,8 +14,6 @@ import java.time.LocalDateTime;
 
 /**
  * MyBatis-Plus 配置类
- *
- * @author seckill
  */
 @Slf4j
 @Configuration
@@ -40,25 +38,25 @@ public class MyBatisPlusConfig {
 
     /**
      * 自动填充处理器
-     * 用于自动填充 create_time 和 update_time
      */
     @Bean
     public MetaObjectHandler metaObjectHandler() {
         return new MetaObjectHandler() {
             @Override
             public void insertFill(MetaObject metaObject) {
-                log.debug("开始插入填充...");
+                // 自动填充创建时间
                 this.strictInsertFill(metaObject, "createTime", LocalDateTime.class, LocalDateTime.now());
+                // 自动填充更新时间
                 this.strictInsertFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
+                // 自动填充逻辑删除字段
                 this.strictInsertFill(metaObject, "deleted", Integer.class, 0);
             }
 
             @Override
             public void updateFill(MetaObject metaObject) {
-                log.debug("开始更新填充...");
+                // 自动填充更新时间
                 this.strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
             }
         };
     }
-
 }

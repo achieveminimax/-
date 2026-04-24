@@ -1,7 +1,7 @@
 package com.seckill.application.controller;
 
-import com.seckill.common.ResponseCodeEnum;
-import com.seckill.common.Result;
+import com.seckill.common.enums.ResponseCodeEnum;
+import com.seckill.common.result.Result;
 import com.seckill.common.exception.BusinessException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

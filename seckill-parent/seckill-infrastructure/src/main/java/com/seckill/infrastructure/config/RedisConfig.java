@@ -1,47 +1,45 @@
 package com.seckill.infrastructure.config;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONReader;
+import com.alibaba.fastjson2.JSONWriter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializer;
+import org.springframework.data.redis.serializer.SerializationException;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * Redis 配置类
- *
- * @author seckill
  */
 @Slf4j
 @Configuration
+@EnableCaching
 public class RedisConfig {
 
     /**
      * 配置 RedisTemplate
-     * 使用 Jackson 进行 JSON 序列化
      */
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
 
-        // 配置 Jackson 序列化器
-        Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = createJackson2JsonRedisSerializer();
+        // 使用 StringRedisSerializer 序列化 key
+        StringRedisSerializer stringSerializer = new StringRedisSerializer();
+        template.setKeySerializer(stringSerializer);
+        template.setHashKeySerializer(stringSerializer);
 
-        // Key 使用 String 序列化
-        StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
-        template.setKeySerializer(stringRedisSerializer);
-        template.setHashKeySerializer(stringRedisSerializer);
-
-        // Value 使用 Jackson 序列化
-        template.setValueSerializer(jackson2JsonRedisSerializer);
-        template.setHashValueSerializer(jackson2JsonRedisSerializer);
+        // 使用 Fastjson2 序列化 value
+        FastJson2JsonRedisSerializer<Object> jsonSerializer = new FastJson2JsonRedisSerializer<>(Object.class);
+        template.setValueSerializer(jsonSerializer);
+        template.setHashValueSerializer(jsonSerializer);
 
         template.afterPropertiesSet();
         log.info("RedisTemplate 配置完成");
@@ -49,25 +47,31 @@ public class RedisConfig {
     }
 
     /**
-     * 创建 Jackson2JsonRedisSerializer
+     * Fastjson2 Redis 序列化器
      */
-    private Jackson2JsonRedisSerializer<Object> createJackson2JsonRedisSerializer() {
-        Jackson2JsonRedisSerializer<Object> serializer = new Jackson2JsonRedisSerializer<>(Object.class);
+    public static class FastJson2JsonRedisSerializer<T> implements RedisSerializer<T> {
 
-        ObjectMapper objectMapper = new ObjectMapper();
-        // 注册 Java 8 时间模块
-        objectMapper.registerModule(new JavaTimeModule());
-        // 禁用日期时间戳输出
-        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        // 启用默认类型信息，用于反序列化时确定具体类型
-        objectMapper.activateDefaultTyping(
-                LaissezFaireSubTypeValidator.instance,
-                ObjectMapper.DefaultTyping.NON_FINAL,
-                JsonTypeInfo.As.PROPERTY
-        );
+        private final Class<T> clazz;
 
-        serializer.setObjectMapper(objectMapper);
-        return serializer;
+        public FastJson2JsonRedisSerializer(Class<T> clazz) {
+            this.clazz = clazz;
+        }
+
+        @Override
+        public byte[] serialize(T value) throws SerializationException {
+            if (value == null) {
+                return new byte[0];
+            }
+            return JSON.toJSONString(value, JSONWriter.Feature.WriteClassName).getBytes(StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public T deserialize(byte[] bytes) throws SerializationException {
+            if (bytes == null || bytes.length == 0) {
+                return null;
+            }
+            String str = new String(bytes, StandardCharsets.UTF_8);
+            return JSON.parseObject(str, clazz, JSONReader.Feature.SupportAutoType);
+        }
     }
-
 }

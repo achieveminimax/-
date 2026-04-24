@@ -2,46 +2,45 @@ package com.seckill.infrastructure.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * RabbitMQ 配置类
- * 定义 Exchange、Queue、Binding 以及消息转换器
- *
- * @author seckill
  */
 @Slf4j
 @Configuration
 public class RabbitMQConfig {
 
-    // ==================== Exchange 定义 ====================
-    public static final String SECKILL_EXCHANGE = "seckill.exchange";
-
-    // ==================== Queue 定义 ====================
+    // ==================== 队列名称 ====================
     public static final String SECKILL_ORDER_QUEUE = "seckill.order.queue";
     public static final String ORDER_PAY_SUCCESS_QUEUE = "order.pay.success.queue";
     public static final String ORDER_TIMEOUT_QUEUE = "order.timeout.queue";
-    public static final String ORDER_TIMEOUT_DLX_QUEUE = "order.timeout.dlx.queue";
     public static final String MAIL_SEND_QUEUE = "mail.send.queue";
 
-    // ==================== Routing Key 定义 ====================
+    // ==================== 交换机名称 ====================
+    public static final String SECKILL_EXCHANGE = "seckill.exchange";
+    public static final String ORDER_EXCHANGE = "order.exchange";
+    public static final String DELAY_EXCHANGE = "delay.exchange";
+
+    // ==================== 路由键 ====================
     public static final String SECKILL_ORDER_ROUTING_KEY = "seckill.order";
     public static final String ORDER_PAY_SUCCESS_ROUTING_KEY = "order.pay.success";
     public static final String ORDER_TIMEOUT_ROUTING_KEY = "order.timeout";
-    public static final String ORDER_TIMEOUT_DLX_ROUTING_KEY = "order.timeout.dlx";
     public static final String MAIL_SEND_ROUTING_KEY = "mail.send";
 
     // ==================== 延迟队列配置 ====================
-    // 订单超时时间：15 分钟（单位：毫秒）
-    public static final long ORDER_TIMEOUT_TTL = 15 * 60 * 1000;
+    public static final String ORDER_TIMEOUT_DELAY_QUEUE = "order.timeout.delay.queue";
+    public static final String ORDER_TIMEOUT_TTL = "900000"; // 15分钟（毫秒）
 
     /**
-     * 消息转换器（使用 Jackson JSON）
+     * 消息转换器（使用 Jackson）
      */
     @Bean
     public MessageConverter messageConverter() {
@@ -49,15 +48,15 @@ public class RabbitMQConfig {
     }
 
     /**
-     * 配置 RabbitTemplate
+     * RabbitTemplate 配置
      */
     @Bean
     public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory, MessageConverter messageConverter) {
-        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
-        rabbitTemplate.setMessageConverter(messageConverter);
+        RabbitTemplate template = new RabbitTemplate(connectionFactory);
+        template.setMessageConverter(messageConverter);
 
-        // 消息确认回调
-        rabbitTemplate.setConfirmCallback((correlationData, ack, cause) -> {
+        // 开启消息确认机制
+        template.setConfirmCallback((correlationData, ack, cause) -> {
             if (ack) {
                 log.debug("消息发送成功: {}", correlationData);
             } else {
@@ -65,31 +64,71 @@ public class RabbitMQConfig {
             }
         });
 
-        // 消息返回回调（当消息无法路由到队列时触发）
-        rabbitTemplate.setReturnsCallback(returned -> {
-            log.error("消息路由失败: exchange={}, routingKey={}, replyCode={}, replyText={}",
-                    returned.getExchange(),
-                    returned.getRoutingKey(),
-                    returned.getReplyCode(),
-                    returned.getReplyText());
+        // 开启消息返回机制（路由失败时回调）
+        template.setReturnsCallback(returned -> {
+            log.error("消息路由失败: exchange={}, routingKey={}, message={}",
+                    returned.getExchange(), returned.getRoutingKey(), returned.getMessage());
         });
 
-        return rabbitTemplate;
-    }
+        // 强制消息返回
+        template.setMandatory(true);
 
-    // ==================== Exchange 声明 ====================
+        log.info("RabbitTemplate 配置完成");
+        return template;
+    }
 
     /**
-     * 秒杀 Exchange（Topic 类型）
+     * 监听器容器工厂配置
      */
     @Bean
-    public TopicExchange seckillExchange() {
-        return ExchangeBuilder.topicExchange(SECKILL_EXCHANGE)
-                .durable(true)
-                .build();
+    public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
+            ConnectionFactory connectionFactory,
+            SimpleRabbitListenerContainerFactoryConfigurer configurer,
+            MessageConverter messageConverter) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        configurer.configure(factory, connectionFactory);
+        factory.setMessageConverter(messageConverter);
+
+        // 并发消费者配置
+        factory.setConcurrentConsumers(5);
+        factory.setMaxConcurrentConsumers(20);
+
+        // 预取数量
+        factory.setPrefetchCount(10);
+
+        // 开启手动 ACK
+        factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+
+        return factory;
     }
 
-    // ==================== Queue 声明 ====================
+    // ==================== 交换机配置 ====================
+
+    /**
+     * 秒杀交换机（直连）
+     */
+    @Bean
+    public DirectExchange seckillExchange() {
+        return new DirectExchange(SECKILL_EXCHANGE, true, false);
+    }
+
+    /**
+     * 订单交换机（直连）
+     */
+    @Bean
+    public DirectExchange orderExchange() {
+        return new DirectExchange(ORDER_EXCHANGE, true, false);
+    }
+
+    /**
+     * 延迟交换机（直连）
+     */
+    @Bean
+    public DirectExchange delayExchange() {
+        return new DirectExchange(DELAY_EXCHANGE, true, false);
+    }
+
+    // ==================== 队列配置 ====================
 
     /**
      * 秒杀订单队列
@@ -97,10 +136,8 @@ public class RabbitMQConfig {
     @Bean
     public Queue seckillOrderQueue() {
         return QueueBuilder.durable(SECKILL_ORDER_QUEUE)
-                // 设置队列最大长度
-                .withArgument("x-max-length", 100000)
-                // 设置消息 TTL（60秒）
-                .withArgument("x-message-ttl", 60000)
+                .withArgument("x-dead-letter-exchange", "")
+                .withArgument("x-dead-letter-routing-key", "")
                 .build();
     }
 
@@ -109,34 +146,27 @@ public class RabbitMQConfig {
      */
     @Bean
     public Queue orderPaySuccessQueue() {
-        return QueueBuilder.durable(ORDER_PAY_SUCCESS_QUEUE)
+        return QueueBuilder.durable(ORDER_PAY_SUCCESS_QUEUE).build();
+    }
+
+    /**
+     * 订单超时延迟队列（带TTL）
+     */
+    @Bean
+    public Queue orderTimeoutDelayQueue() {
+        return QueueBuilder.durable(ORDER_TIMEOUT_DELAY_QUEUE)
+                .withArgument("x-dead-letter-exchange", DELAY_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", ORDER_TIMEOUT_ROUTING_KEY)
+                .withArgument("x-message-ttl", Integer.parseInt(ORDER_TIMEOUT_TTL))
                 .build();
     }
 
     /**
-     * 订单超时队列（延迟队列）
-     * 消息过期后转发到死信队列
+     * 订单超时处理队列
      */
     @Bean
     public Queue orderTimeoutQueue() {
-        return QueueBuilder.durable(ORDER_TIMEOUT_QUEUE)
-                // 设置消息 TTL（15分钟）
-                .withArgument("x-message-ttl", ORDER_TIMEOUT_TTL)
-                // 设置死信交换机
-                .withArgument("x-dead-letter-exchange", SECKILL_EXCHANGE)
-                // 设置死信路由键
-                .withArgument("x-dead-letter-routing-key", ORDER_TIMEOUT_DLX_ROUTING_KEY)
-                .build();
-    }
-
-    /**
-     * 订单超时死信队列
-     * 接收超时未支付的订单消息
-     */
-    @Bean
-    public Queue orderTimeoutDlxQueue() {
-        return QueueBuilder.durable(ORDER_TIMEOUT_DLX_QUEUE)
-                .build();
+        return QueueBuilder.durable(ORDER_TIMEOUT_QUEUE).build();
     }
 
     /**
@@ -144,19 +174,17 @@ public class RabbitMQConfig {
      */
     @Bean
     public Queue mailSendQueue() {
-        return QueueBuilder.durable(MAIL_SEND_QUEUE)
-                .build();
+        return QueueBuilder.durable(MAIL_SEND_QUEUE).build();
     }
 
-    // ==================== Binding 声明 ====================
+    // ==================== 绑定配置 ====================
 
     /**
      * 秒杀订单队列绑定
      */
     @Bean
     public Binding seckillOrderBinding() {
-        return BindingBuilder
-                .bind(seckillOrderQueue())
+        return BindingBuilder.bind(seckillOrderQueue())
                 .to(seckillExchange())
                 .with(SECKILL_ORDER_ROUTING_KEY);
     }
@@ -166,9 +194,8 @@ public class RabbitMQConfig {
      */
     @Bean
     public Binding orderPaySuccessBinding() {
-        return BindingBuilder
-                .bind(orderPaySuccessQueue())
-                .to(seckillExchange())
+        return BindingBuilder.bind(orderPaySuccessQueue())
+                .to(orderExchange())
                 .with(ORDER_PAY_SUCCESS_ROUTING_KEY);
     }
 
@@ -177,21 +204,9 @@ public class RabbitMQConfig {
      */
     @Bean
     public Binding orderTimeoutBinding() {
-        return BindingBuilder
-                .bind(orderTimeoutQueue())
-                .to(seckillExchange())
+        return BindingBuilder.bind(orderTimeoutQueue())
+                .to(delayExchange())
                 .with(ORDER_TIMEOUT_ROUTING_KEY);
-    }
-
-    /**
-     * 订单超时死信队列绑定
-     */
-    @Bean
-    public Binding orderTimeoutDlxBinding() {
-        return BindingBuilder
-                .bind(orderTimeoutDlxQueue())
-                .to(seckillExchange())
-                .with(ORDER_TIMEOUT_DLX_ROUTING_KEY);
     }
 
     /**
@@ -199,10 +214,8 @@ public class RabbitMQConfig {
      */
     @Bean
     public Binding mailSendBinding() {
-        return BindingBuilder
-                .bind(mailSendQueue())
-                .to(seckillExchange())
+        return BindingBuilder.bind(mailSendQueue())
+                .to(orderExchange())
                 .with(MAIL_SEND_ROUTING_KEY);
     }
-
 }

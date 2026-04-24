@@ -2,5 +2,7 @@ com/seckill/infrastructure/config/MyBatisPlusConfig.class
 com/seckill/infrastructure/utils/RedisUtils.class
 com/seckill/infrastructure/config/Knife4jConfig.class
 com/seckill/infrastructure/config/MyBatisPlusConfig$1.class
+com/seckill/infrastructure/config/WebMvcConfig.class
 com/seckill/infrastructure/config/RedisConfig.class
+com/seckill/infrastructure/config/RedisConfig$FastJson2JsonRedisSerializer.class
 com/seckill/infrastructure/config/RabbitMQConfig.class

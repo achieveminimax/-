@@ -12,32 +12,50 @@
 
     <artifactId>seckill-seckill</artifactId>
     <name>seckill-seckill</name>
-    <description>秒杀核心模块 - 秒杀流程、库存预扣、限流</description>
+    <description>秒杀模块 - 秒杀活动、抢购核心逻辑</description>
 
     <dependencies>
-        <!-- 依赖 infrastructure 模块 -->
+        <!-- Common Module -->
+        <dependency>
+            <groupId>com.seckill</groupId>
+            <artifactId>seckill-common</artifactId>
+        </dependency>
+
+        <!-- Infrastructure Module -->
         <dependency>
             <groupId>com.seckill</groupId>
             <artifactId>seckill-infrastructure</artifactId>
         </dependency>
 
-        <!-- 依赖 user 模块（获取用户信息） -->
+        <!-- Spring Boot Web -->
         <dependency>
-            <groupId>com.seckill</groupId>
-            <artifactId>seckill-user</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- 依赖 goods 模块（获取商品信息） -->
+        <!-- Spring Boot AMQP -->
         <dependency>
-            <groupId>com.seckill</groupId>
-            <artifactId>seckill-goods</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
 
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <scope>provided</scope>
+        </dependency>
+
+        <!-- MapStruct -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
