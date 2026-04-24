@@ -46,3 +46,9 @@ coverage/
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+# 开发记录和里程碑文档目录
+development-records/
+milestone-docs/
+开发记录/
+里程碑文档/

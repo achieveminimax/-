@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.seckill</groupId>
+        <artifactId>seckill-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>seckill-admin</artifactId>
+    <name>seckill-admin</name>
+    <description>管理后台模块 - 商品管理、订单管理、数据统计</description>
+
+    <dependencies>
+        <!-- 依赖 infrastructure 模块 -->
+        <dependency>
+            <groupId>com.seckill</groupId>
+            <artifactId>seckill-infrastructure</artifactId>
+        </dependency>
+
+        <!-- 依赖 user 模块 -->
+        <dependency>
+            <groupId>com.seckill</groupId>
+            <artifactId>seckill-user</artifactId>
+        </dependency>
+
+        <!-- 依赖 goods 模块 -->
+        <dependency>
+            <groupId>com.seckill</groupId>
+            <artifactId>seckill-goods</artifactId>
+        </dependency>
+
+        <!-- 依赖 order 模块 -->
+        <dependency>
+            <groupId>com.seckill</groupId>
+            <artifactId>seckill-order</artifactId>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+</project>

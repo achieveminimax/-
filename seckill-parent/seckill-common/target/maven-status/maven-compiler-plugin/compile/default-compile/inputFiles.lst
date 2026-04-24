@@ -1,0 +1,11 @@
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/PageRequest.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/PageResult.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/ResponseCodeEnum.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/Result.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/constant/RedisKeyConstant.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/entity/BaseEntity.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/exception/BusinessException.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/exception/GlobalExceptionHandler.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/utils/JsonUtils.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/utils/JwtUtils.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/utils/SnowflakeIdWorker.java

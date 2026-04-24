@@ -1,0 +1,15 @@
+# ======================================================== 
+# 开发环境配置
+# ======================================================== 
+
+spring:
+  # 开发环境特定配置
+  devtools:
+    restart:
+      enabled: true
+
+# 日志级别
+logging:
+  level:
+    com.seckill: debug
+    org.springframework.jdbc: debug

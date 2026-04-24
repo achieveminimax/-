@@ -1,0 +1,134 @@
+{
+  "rabbit_version": "3.12.0",
+  "rabbitmq_version": "3.12.0",
+  "product_name": "RabbitMQ",
+  "product_version": "3.12.0",
+  "users": [
+    {
+      "name": "admin",
+      "password_hash": "YWRtaW4xMjM=",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": "administrator"
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "admin",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "topic_permissions": [],
+  "parameters": [],
+  "global_parameters": [
+    {
+      "name": "cluster_name",
+      "value": "rabbit@seckill-rabbitmq"
+    }
+  ],
+  "policies": [],
+  "queues": [
+    {
+      "name": "seckill.order.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 60000,
+        "x-max-length": 100000
+      }
+    },
+    {
+      "name": "order.pay.success.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "order.timeout.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 900000,
+        "x-dead-letter-exchange": "seckill.exchange",
+        "x-dead-letter-routing-key": "order.timeout.dlx"
+      }
+    },
+    {
+      "name": "order.timeout.dlx.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "mail.send.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "seckill.exchange",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "seckill.exchange",
+      "vhost": "/",
+      "destination": "seckill.order.queue",
+      "destination_type": "queue",
+      "routing_key": "seckill.order",
+      "arguments": {}
+    },
+    {
+      "source": "seckill.exchange",
+      "vhost": "/",
+      "destination": "order.pay.success.queue",
+      "destination_type": "queue",
+      "routing_key": "order.pay.success",
+      "arguments": {}
+    },
+    {
+      "source": "seckill.exchange",
+      "vhost": "/",
+      "destination": "order.timeout.queue",
+      "destination_type": "queue",
+      "routing_key": "order.timeout",
+      "arguments": {}
+    },
+    {
+      "source": "seckill.exchange",
+      "vhost": "/",
+      "destination": "order.timeout.dlx.queue",
+      "destination_type": "queue",
+      "routing_key": "order.timeout.dlx",
+      "arguments": {}
+    },
+    {
+      "source": "seckill.exchange",
+      "vhost": "/",
+      "destination": "mail.send.queue",
+      "destination_type": "queue",
+      "routing_key": "mail.send",
+      "arguments": {}
+    }
+  ]
+}
