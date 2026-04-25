@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.seckill.seckill.service.SeckillServiceUnitTest
 -------------------------------------------------------------------------------
-Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.138 s -- in com.seckill.seckill.service.SeckillServiceUnitTest
+Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.081 s -- in com.seckill.seckill.service.SeckillServiceUnitTest

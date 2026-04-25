@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-user</a> &gt; <a href="index.source.html" class="el_package">com.seckill.user.service.impl</a> &gt; <span class="el_source">UserServiceImpl.java</span></div><h1>UserServiceImpl.java</h1><pre class="source lang-java linenums">package com.seckill.user.service.impl;
+
+import com.seckill.common.enums.ResponseCodeEnum;
+import com.seckill.common.exception.BusinessException;
+import com.seckill.common.utils.JwtUtils;
+import com.seckill.infrastructure.utils.RedisUtils;
+import com.seckill.user.dto.*;
+import com.seckill.user.entity.User;
+import com.seckill.user.mapper.UserMapper;
+import com.seckill.user.service.UserService;
+import io.jsonwebtoken.Claims;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * 用户服务实现类
+ */
+<span class="fc" id="L25">@Slf4j</span>
+@Service
+<span class="fc" id="L27">@RequiredArgsConstructor</span>
+public class UserServiceImpl implements UserService {
+
+    private final UserMapper userMapper;
+    private final RedisUtils redisUtils;
+    private final BCryptPasswordEncoder passwordEncoder;
+
+    // Token 有效期（秒）
+    private static final long ACCESS_TOKEN_EXPIRE = 30 * 60; // 30分钟
+    private static final long REFRESH_TOKEN_EXPIRE = 7 * 24 * 60 * 60; // 7天
+
+    // Redis Key 前缀
+    private static final String USER_TOKEN_KEY = &quot;user:token:&quot;;
+    private static final String USER_REFRESH_KEY = &quot;user:refresh:&quot;;
+    private static final String TOKEN_BLACKLIST_KEY = &quot;token:blacklist:&quot;;
+    private static final String LOGIN_FAIL_KEY = &quot;login:fail:&quot;;
+    private static final String USER_LOCK_KEY = &quot;user:lock:&quot;;
+
+    // 登录失败最大次数和锁定时间
+    private static final int MAX_LOGIN_FAIL_COUNT = 5;
+    private static final long LOCK_TIME_MINUTES = 30;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public UserRegisterResponse register(UserRegisterRequest request) {
+        // 校验密码和确认密码是否一致
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (!request.getPassword().equals(request.getConfirmPassword())) {</span>
+<span class="fc" id="L54">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;两次输入的密码不一致&quot;);</span>
+        }
+
+        // 校验验证码（模拟，固定值888888）
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (!&quot;888888&quot;.equals(request.getVerifyCode())) {</span>
+<span class="fc" id="L59">            throw new BusinessException(ResponseCodeEnum.VERIFY_CODE_ERROR);</span>
+        }
+
+        // 检查用户名是否已存在
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (userMapper.countByUsername(request.getUsername()) &gt; 0) {</span>
+<span class="fc" id="L64">            throw new BusinessException(ResponseCodeEnum.USERNAME_EXISTS);</span>
+        }
+
+        // 检查手机号是否已存在
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (userMapper.countByPhone(request.getPhone()) &gt; 0) {</span>
+<span class="fc" id="L69">            throw new BusinessException(ResponseCodeEnum.PHONE_EXISTS);</span>
+        }
+
+        // 创建用户实体
+<span class="fc" id="L73">        User user = new User();</span>
+<span class="fc" id="L74">        user.setUsername(request.getUsername());</span>
+<span class="fc" id="L75">        user.setPassword(passwordEncoder.encode(request.getPassword()));</span>
+<span class="fc" id="L76">        user.setPhone(request.getPhone());</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        user.setNickname(StringUtils.hasText(request.getNickname()) ? request.getNickname() : request.getUsername());</span>
+<span class="fc" id="L78">        user.setEmail(request.getEmail());</span>
+<span class="fc" id="L79">        user.setGender(0);</span>
+<span class="fc" id="L80">        user.setStatus(1);</span>
+<span class="fc" id="L81">        user.setLoginFailCount(0);</span>
+
+        // 保存用户
+<span class="fc" id="L84">        userMapper.insert(user);</span>
+
+        // 生成 Token
+<span class="fc" id="L87">        String token = JwtUtils.generateAccessToken(user.getId());</span>
+<span class="fc" id="L88">        String refreshToken = JwtUtils.generateRefreshToken(user.getId());</span>
+
+        // 保存 Token 到 Redis
+<span class="fc" id="L91">        redisUtils.set(USER_TOKEN_KEY + user.getId(), token, ACCESS_TOKEN_EXPIRE, TimeUnit.SECONDS);</span>
+<span class="fc" id="L92">        redisUtils.set(USER_REFRESH_KEY + user.getId(), refreshToken, REFRESH_TOKEN_EXPIRE, TimeUnit.SECONDS);</span>
+
+        // 构建响应
+<span class="fc" id="L95">        UserRegisterResponse response = new UserRegisterResponse();</span>
+<span class="fc" id="L96">        response.setUserId(user.getId());</span>
+<span class="fc" id="L97">        response.setUsername(user.getUsername());</span>
+<span class="fc" id="L98">        response.setNickname(user.getNickname());</span>
+<span class="fc" id="L99">        response.setAvatar(user.getAvatar());</span>
+<span class="fc" id="L100">        response.setToken(token);</span>
+<span class="fc" id="L101">        response.setRefreshToken(refreshToken);</span>
+<span class="fc" id="L102">        response.setExpiresIn(ACCESS_TOKEN_EXPIRE);</span>
+
+<span class="fc" id="L104">        log.info(&quot;用户注册成功: {}&quot;, user.getUsername());</span>
+<span class="fc" id="L105">        return response;</span>
+    }
+
+    @Override
+    public UserLoginResponse login(UserLoginRequest request) {
+<span class="fc" id="L110">        String account = request.getAccount();</span>
+
+        // 根据账号查询用户（支持用户名或手机号登录）
+        User user;
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (account.matches(&quot;^1[3-9]\\d{9}$&quot;)) {</span>
+            // 手机号登录
+<span class="fc" id="L116">            user = userMapper.selectByPhone(account);</span>
+        } else {
+            // 用户名登录
+<span class="fc" id="L119">            user = userMapper.selectByUsername(account);</span>
+        }
+
+        // 用户不存在
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (user == null) {</span>
+<span class="fc" id="L124">            throw new BusinessException(ResponseCodeEnum.USER_NOT_FOUND);</span>
+        }
+
+        // 检查账号是否被锁定
+<span class="fc" id="L128">        String lockKey = USER_LOCK_KEY + user.getId();</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (Boolean.TRUE.equals(redisUtils.hasKey(lockKey))) {</span>
+<span class="fc" id="L130">            throw new BusinessException(ResponseCodeEnum.FORBIDDEN, &quot;账号已锁定，请&quot; + LOCK_TIME_MINUTES + &quot;分钟后重试&quot;);</span>
+        }
+
+        // 检查用户状态
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (user.getStatus() == 0) {</span>
+<span class="fc" id="L135">            throw new BusinessException(ResponseCodeEnum.FORBIDDEN, &quot;账号已被禁用&quot;);</span>
+        }
+
+        // 验证密码
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {</span>
+            // 记录登录失败次数
+<span class="fc" id="L141">            recordLoginFail(user.getId());</span>
+<span class="fc" id="L142">            throw new BusinessException(ResponseCodeEnum.BAD_REQUEST, &quot;账号或密码错误&quot;);</span>
+        }
+
+        // 登录成功，清除失败记录
+<span class="fc" id="L146">        clearLoginFail(user.getId());</span>
+
+        // 更新最后登录时间
+<span class="fc" id="L149">        user.setLoginFailCount(0);</span>
+<span class="fc" id="L150">        user.setLockTime(LocalDateTime.now());</span>
+<span class="fc" id="L151">        userMapper.updateById(user);</span>
+
+        // 生成 Token
+<span class="fc" id="L154">        String token = JwtUtils.generateAccessToken(user.getId());</span>
+<span class="fc" id="L155">        String refreshToken = JwtUtils.generateRefreshToken(user.getId());</span>
+
+        // 保存 Token 到 Redis
+<span class="fc" id="L158">        redisUtils.set(USER_TOKEN_KEY + user.getId(), token, ACCESS_TOKEN_EXPIRE, TimeUnit.SECONDS);</span>
+<span class="fc" id="L159">        redisUtils.set(USER_REFRESH_KEY + user.getId(), refreshToken, REFRESH_TOKEN_EXPIRE, TimeUnit.SECONDS);</span>
+
+        // 构建响应
+<span class="fc" id="L162">        UserLoginResponse response = new UserLoginResponse();</span>
+<span class="fc" id="L163">        response.setUserId(user.getId());</span>
+<span class="fc" id="L164">        response.setAccount(account);</span>
+<span class="fc" id="L165">        response.setNickname(user.getNickname());</span>
+<span class="fc" id="L166">        response.setAvatar(user.getAvatar());</span>
+<span class="fc" id="L167">        response.setToken(token);</span>
+<span class="fc" id="L168">        response.setRefreshToken(refreshToken);</span>
+<span class="fc" id="L169">        response.setExpiresIn(ACCESS_TOKEN_EXPIRE);</span>
+
+<span class="fc" id="L171">        log.info(&quot;用户登录成功: {}&quot;, user.getUsername());</span>
+<span class="fc" id="L172">        return response;</span>
+    }
+
+    @Override
+    public void logout(String token, Long userId) {
+        // 将 Token 加入黑名单
+<span class="fc" id="L178">        long remainingTime = JwtUtils.getRemainingTime(token);</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (remainingTime &gt; 0) {</span>
+<span class="fc" id="L180">            redisUtils.set(TOKEN_BLACKLIST_KEY + token, &quot;1&quot;, remainingTime, TimeUnit.MILLISECONDS);</span>
+        }
+
+        // 清除用户 Token
+<span class="fc" id="L184">        redisUtils.delete(USER_TOKEN_KEY + userId);</span>
+<span class="fc" id="L185">        redisUtils.delete(USER_REFRESH_KEY + userId);</span>
+
+<span class="fc" id="L187">        log.info(&quot;用户登出成功: {}&quot;, userId);</span>
+<span class="fc" id="L188">    }</span>
+
+    @Override
+    public TokenRefreshResponse refreshToken(TokenRefreshRequest request) {
+<span class="fc" id="L192">        String refreshToken = request.getRefreshToken();</span>
+
+        // 验证 Refresh Token 是否有效
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (!JwtUtils.validateToken(refreshToken)) {</span>
+<span class="nc" id="L196">            throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, &quot;Refresh Token 无效或已过期&quot;);</span>
+        }
+
+<span class="fc" id="L199">        Claims claims = JwtUtils.parseToken(refreshToken);</span>
+<span class="fc" id="L200">        Object tokenType = claims.get(&quot;type&quot;);</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (!&quot;refresh&quot;.equals(tokenType)) {</span>
+<span class="fc" id="L202">            throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, &quot;Refresh Token 类型错误&quot;);</span>
+        }
+
+        // 检查是否在黑名单中
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (Boolean.TRUE.equals(redisUtils.hasKey(TOKEN_BLACKLIST_KEY + refreshToken))) {</span>
+<span class="nc" id="L207">            throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, &quot;Refresh Token 已失效&quot;);</span>
+        }
+
+        // 获取用户ID
+<span class="nc" id="L211">        Long userId = Long.valueOf(claims.getSubject());</span>
+
+        // 验证 Redis 中的 Refresh Token 是否一致
+<span class="nc" id="L214">        String storedRefreshToken = (String) redisUtils.get(USER_REFRESH_KEY + userId);</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (!refreshToken.equals(storedRefreshToken)) {</span>
+<span class="nc" id="L216">            throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, &quot;Refresh Token 已失效&quot;);</span>
+        }
+
+        // 将旧的 Refresh Token 加入黑名单
+<span class="nc" id="L220">        long remainingTime = JwtUtils.getRemainingTime(refreshToken);</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        if (remainingTime &gt; 0) {</span>
+<span class="nc" id="L222">            redisUtils.set(TOKEN_BLACKLIST_KEY + refreshToken, &quot;1&quot;, remainingTime, TimeUnit.MILLISECONDS);</span>
+        }
+
+        // 生成新的 Token
+<span class="nc" id="L226">        String newToken = JwtUtils.generateAccessToken(userId);</span>
+<span class="nc" id="L227">        String newRefreshToken = JwtUtils.generateRefreshToken(userId);</span>
+
+        // 保存新的 Token 到 Redis
+<span class="nc" id="L230">        redisUtils.set(USER_TOKEN_KEY + userId, newToken, ACCESS_TOKEN_EXPIRE, TimeUnit.SECONDS);</span>
+<span class="nc" id="L231">        redisUtils.set(USER_REFRESH_KEY + userId, newRefreshToken, REFRESH_TOKEN_EXPIRE, TimeUnit.SECONDS);</span>
+
+        // 构建响应
+<span class="nc" id="L234">        TokenRefreshResponse response = new TokenRefreshResponse();</span>
+<span class="nc" id="L235">        response.setToken(newToken);</span>
+<span class="nc" id="L236">        response.setRefreshToken(newRefreshToken);</span>
+<span class="nc" id="L237">        response.setExpiresIn(ACCESS_TOKEN_EXPIRE);</span>
+
+<span class="nc" id="L239">        log.info(&quot;Token 刷新成功: {}&quot;, userId);</span>
+<span class="nc" id="L240">        return response;</span>
+    }
+
+    @Override
+    public UserInfoResponse getUserInfo(Long userId) {
+<span class="fc" id="L245">        User user = userMapper.selectById(userId);</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        if (user == null) {</span>
+<span class="fc" id="L247">            throw new BusinessException(ResponseCodeEnum.USER_NOT_FOUND);</span>
+        }
+
+<span class="fc" id="L250">        UserInfoResponse response = new UserInfoResponse();</span>
+<span class="fc" id="L251">        response.setUserId(user.getId());</span>
+<span class="fc" id="L252">        response.setUsername(user.getUsername());</span>
+<span class="fc" id="L253">        response.setNickname(user.getNickname());</span>
+<span class="fc" id="L254">        response.setAvatar(user.getAvatar());</span>
+        // 手机号脱敏
+<span class="fc" id="L256">        response.setPhone(maskPhone(user.getPhone()));</span>
+<span class="fc" id="L257">        response.setEmail(user.getEmail());</span>
+<span class="fc" id="L258">        response.setGender(user.getGender());</span>
+<span class="fc" id="L259">        response.setBirthday(user.getBirthday());</span>
+<span class="fc" id="L260">        response.setStatus(user.getStatus());</span>
+<span class="fc" id="L261">        response.setCreateTime(user.getCreateTime());</span>
+<span class="fc" id="L262">        response.setLastLoginTime(user.getLockTime()); // 使用 lockTime 字段存储最后登录时间</span>
+
+<span class="fc" id="L264">        return response;</span>
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateUserInfo(Long userId, UserUpdateRequest request) {
+<span class="fc" id="L270">        User user = userMapper.selectById(userId);</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        if (user == null) {</span>
+<span class="fc" id="L272">            throw new BusinessException(ResponseCodeEnum.USER_NOT_FOUND);</span>
+        }
+
+        // 更新字段
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        if (StringUtils.hasText(request.getNickname())) {</span>
+<span class="fc" id="L277">            user.setNickname(request.getNickname());</span>
+        }
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        if (StringUtils.hasText(request.getGender())) {</span>
+            int gender;
+            try {
+<span class="fc" id="L282">                gender = Integer.parseInt(request.getGender());</span>
+<span class="fc" id="L283">            } catch (NumberFormatException e) {</span>
+<span class="fc" id="L284">                throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;gender 参数非法&quot;);</span>
+<span class="fc" id="L285">            }</span>
+<span class="pc bpc" id="L286" title="1 of 4 branches missed.">            if (gender &lt; 0 || gender &gt; 2) {</span>
+<span class="fc" id="L287">                throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;gender 参数非法&quot;);</span>
+            }
+<span class="fc" id="L289">            user.setGender(gender);</span>
+        }
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">        if (request.getBirthday() != null) {</span>
+<span class="fc" id="L292">            user.setBirthday(request.getBirthday());</span>
+        }
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        if (StringUtils.hasText(request.getEmail())) {</span>
+<span class="fc" id="L295">            user.setEmail(request.getEmail());</span>
+        }
+
+<span class="fc" id="L298">        userMapper.updateById(user);</span>
+<span class="fc" id="L299">        log.info(&quot;用户信息更新成功: {}&quot;, userId);</span>
+<span class="fc" id="L300">    }</span>
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updatePassword(Long userId, PasswordUpdateRequest request) {
+        // 校验新密码和确认密码是否一致
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        if (!request.getNewPassword().equals(request.getConfirmPassword())) {</span>
+<span class="fc" id="L307">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;两次输入的密码不一致&quot;);</span>
+        }
+
+<span class="fc" id="L310">        User user = userMapper.selectById(userId);</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (user == null) {</span>
+<span class="fc" id="L312">            throw new BusinessException(ResponseCodeEnum.USER_NOT_FOUND);</span>
+        }
+
+        // 验证旧密码
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {</span>
+<span class="fc" id="L317">            throw new BusinessException(ResponseCodeEnum.BAD_REQUEST, &quot;原密码错误&quot;);</span>
+        }
+
+        // 新密码不能与旧密码相同
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {</span>
+<span class="fc" id="L322">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;新密码不能与旧密码相同&quot;);</span>
+        }
+
+        // 更新密码
+<span class="fc" id="L326">        user.setPassword(passwordEncoder.encode(request.getNewPassword()));</span>
+<span class="fc" id="L327">        userMapper.updateById(user);</span>
+
+        // 使所有 Token 失效（强制重新登录）
+<span class="fc" id="L330">        redisUtils.delete(USER_TOKEN_KEY + userId);</span>
+<span class="fc" id="L331">        redisUtils.delete(USER_REFRESH_KEY + userId);</span>
+
+<span class="fc" id="L333">        log.info(&quot;用户密码更新成功: {}&quot;, userId);</span>
+<span class="fc" id="L334">    }</span>
+
+    /**
+     * 记录登录失败次数
+     */
+    private void recordLoginFail(Long userId) {
+<span class="fc" id="L340">        String failKey = LOGIN_FAIL_KEY + userId;</span>
+<span class="fc" id="L341">        Long count = redisUtils.increment(failKey, 1);</span>
+<span class="fc" id="L342">        redisUtils.expire(failKey, LOCK_TIME_MINUTES, TimeUnit.MINUTES);</span>
+
+<span class="pc bpc" id="L344" title="1 of 4 branches missed.">        if (count != null &amp;&amp; count &gt;= MAX_LOGIN_FAIL_COUNT) {</span>
+            // 锁定账号
+<span class="fc" id="L346">            redisUtils.set(USER_LOCK_KEY + userId, &quot;1&quot;, LOCK_TIME_MINUTES, TimeUnit.MINUTES);</span>
+<span class="fc" id="L347">            log.warn(&quot;账号被锁定: {}, 失败次数: {}&quot;, userId, count);</span>
+        }
+<span class="fc" id="L349">    }</span>
+
+    /**
+     * 清除登录失败记录
+     */
+    private void clearLoginFail(Long userId) {
+<span class="fc" id="L355">        redisUtils.delete(LOGIN_FAIL_KEY + userId);</span>
+<span class="fc" id="L356">    }</span>
+
+    /**
+     * 手机号脱敏
+     */
+    private String maskPhone(String phone) {
+<span class="pc bpc" id="L362" title="2 of 4 branches missed.">        if (phone == null || phone.length() != 11) {</span>
+<span class="nc" id="L363">            return phone;</span>
+        }
+<span class="fc" id="L365">        return phone.substring(0, 3) + &quot;****&quot; + phone.substring(7);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
