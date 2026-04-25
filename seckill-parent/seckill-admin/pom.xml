@@ -27,6 +27,30 @@
             <artifactId>seckill-infrastructure</artifactId>
         </dependency>
 
+        <!-- Goods Module -->
+        <dependency>
+            <groupId>com.seckill</groupId>
+            <artifactId>seckill-goods</artifactId>
+        </dependency>
+
+        <!-- User Module -->
+        <dependency>
+            <groupId>com.seckill</groupId>
+            <artifactId>seckill-user</artifactId>
+        </dependency>
+
+        <!-- Order Module -->
+        <dependency>
+            <groupId>com.seckill</groupId>
+            <artifactId>seckill-order</artifactId>
+        </dependency>
+
+        <!-- MyBatis-Plus -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+        </dependency>
+
         <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -37,6 +61,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- Validation -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
         <!-- Lombok -->
@@ -55,6 +85,13 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- H2 Database for Testing -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

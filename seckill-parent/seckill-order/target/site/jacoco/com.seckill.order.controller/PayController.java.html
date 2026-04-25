@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PayController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-order</a> &gt; <a href="index.source.html" class="el_package">com.seckill.order.controller</a> &gt; <span class="el_source">PayController.java</span></div><h1>PayController.java</h1><pre class="source lang-java linenums">package com.seckill.order.controller;
+
+import com.seckill.common.result.Result;
+import com.seckill.order.dto.PayCallbackRequest;
+import com.seckill.order.dto.PayCreateRequest;
+import com.seckill.order.dto.PayCreateResponse;
+import com.seckill.order.dto.PayStatusResponse;
+import com.seckill.order.service.PayService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * 支付控制器
+ */
+@Tag(name = &quot;支付管理&quot;, description = &quot;支付相关接口&quot;)
+@Validated
+@RestController
+@RequestMapping(&quot;/api/pay&quot;)
+<span class="nc" id="L25">@RequiredArgsConstructor</span>
+public class PayController {
+
+    private final PayService payService;
+
+    /**
+     * 发起支付
+     */
+    @Operation(summary = &quot;发起支付&quot;, description = &quot;对指定订单发起支付&quot;)
+    @PostMapping(&quot;/create&quot;)
+    public Result&lt;PayCreateResponse&gt; create(
+            @Valid @RequestBody PayCreateRequest request) {
+<span class="nc" id="L37">        PayCreateResponse response = payService.createPay(request.getOrderNo(), request.getPayType());</span>
+<span class="nc" id="L38">        return Result.success(response);</span>
+    }
+
+    /**
+     * 支付回调（模拟）
+     */
+    @Operation(summary = &quot;支付回调&quot;, description = &quot;模拟第三方支付回调&quot;)
+    @PostMapping(&quot;/callback&quot;)
+    public Result&lt;Void&gt; callback(
+            @Valid @RequestBody PayCallbackRequest request) {
+<span class="nc" id="L48">        payService.payCallback(request.getPayNo(), request.getTradeNo());</span>
+<span class="nc" id="L49">        return Result.success();</span>
+    }
+
+    /**
+     * 查询支付状态
+     */
+    @Operation(summary = &quot;查询支付状态&quot;, description = &quot;查询指定订单的支付状态&quot;)
+    @GetMapping(&quot;/status/{orderNo}&quot;)
+    public Result&lt;PayStatusResponse&gt; status(
+            @Parameter(description = &quot;订单编号&quot;, required = true)
+            @NotBlank(message = &quot;订单编号不能为空&quot;)
+            @PathVariable String orderNo) {
+<span class="nc" id="L61">        PayStatusResponse response = payService.queryPayStatus(orderNo);</span>
+<span class="nc" id="L62">        return Result.success(response);</span>
+    }
+
+    /**
+     * 模拟支付页面（用于测试）
+     */
+    @Operation(summary = &quot;模拟支付&quot;, description = &quot;模拟支付页面，用于测试&quot;)
+    @GetMapping(&quot;/mock/{payNo}&quot;)
+    public Result&lt;String&gt; mockPay(
+            @Parameter(description = &quot;支付流水号&quot;, required = true)
+            @NotBlank(message = &quot;支付流水号不能为空&quot;)
+            @PathVariable String payNo) {
+        // 模拟支付成功，直接回调
+<span class="nc" id="L75">        String mockTradeNo = &quot;MOCK&quot; + System.currentTimeMillis();</span>
+<span class="nc" id="L76">        payService.payCallback(payNo, mockTradeNo);</span>
+<span class="nc" id="L77">        return Result.success(&quot;支付成功&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

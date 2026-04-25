@@ -20,17 +20,20 @@ public class RabbitMQConfig {
 
     // ==================== 队列名称 ====================
     public static final String SECKILL_ORDER_QUEUE = "seckill.order.queue";
+    public static final String SECKILL_ORDER_DLX_QUEUE = "seckill.order.dlx.queue";
     public static final String ORDER_PAY_SUCCESS_QUEUE = "order.pay.success.queue";
     public static final String ORDER_TIMEOUT_QUEUE = "order.timeout.queue";
     public static final String MAIL_SEND_QUEUE = "mail.send.queue";
 
     // ==================== 交换机名称 ====================
     public static final String SECKILL_EXCHANGE = "seckill.exchange";
+    public static final String SECKILL_DLX_EXCHANGE = "seckill.dlx.exchange";
     public static final String ORDER_EXCHANGE = "order.exchange";
     public static final String DELAY_EXCHANGE = "delay.exchange";
 
     // ==================== 路由键 ====================
     public static final String SECKILL_ORDER_ROUTING_KEY = "seckill.order";
+    public static final String SECKILL_ORDER_DLX_ROUTING_KEY = "seckill.order.dlx";
     public static final String ORDER_PAY_SUCCESS_ROUTING_KEY = "order.pay.success";
     public static final String ORDER_TIMEOUT_ROUTING_KEY = "order.timeout";
     public static final String MAIL_SEND_ROUTING_KEY = "mail.send";
@@ -98,6 +101,7 @@ public class RabbitMQConfig {
 
         // 开启手动 ACK
         factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+        factory.setDefaultRequeueRejected(false);
 
         return factory;
     }
@@ -110,6 +114,11 @@ public class RabbitMQConfig {
     @Bean
     public DirectExchange seckillExchange() {
         return new DirectExchange(SECKILL_EXCHANGE, true, false);
+    }
+
+    @Bean
+    public DirectExchange seckillDlxExchange() {
+        return new DirectExchange(SECKILL_DLX_EXCHANGE, true, false);
     }
 
     /**
@@ -136,9 +145,14 @@ public class RabbitMQConfig {
     @Bean
     public Queue seckillOrderQueue() {
         return QueueBuilder.durable(SECKILL_ORDER_QUEUE)
-                .withArgument("x-dead-letter-exchange", "")
-                .withArgument("x-dead-letter-routing-key", "")
+                .withArgument("x-dead-letter-exchange", SECKILL_DLX_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", SECKILL_ORDER_DLX_ROUTING_KEY)
                 .build();
+    }
+
+    @Bean
+    public Queue seckillOrderDlxQueue() {
+        return QueueBuilder.durable(SECKILL_ORDER_DLX_QUEUE).build();
     }
 
     /**
@@ -187,6 +201,13 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(seckillOrderQueue())
                 .to(seckillExchange())
                 .with(SECKILL_ORDER_ROUTING_KEY);
+    }
+
+    @Bean
+    public Binding seckillOrderDlxBinding() {
+        return BindingBuilder.bind(seckillOrderDlxQueue())
+                .to(seckillDlxExchange())
+                .with(SECKILL_ORDER_DLX_ROUTING_KEY);
     }
 
     /**

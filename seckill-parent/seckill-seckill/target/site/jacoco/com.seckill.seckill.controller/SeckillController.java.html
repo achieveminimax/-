@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SeckillController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-seckill</a> &gt; <a href="index.source.html" class="el_package">com.seckill.seckill.controller</a> &gt; <span class="el_source">SeckillController.java</span></div><h1>SeckillController.java</h1><pre class="source lang-java linenums">package com.seckill.seckill.controller;
+
+import com.seckill.common.result.Result;
+import com.seckill.common.utils.UserContext;
+import com.seckill.seckill.annotation.RateLimit;
+import com.seckill.seckill.annotation.RateLimitScene;
+import com.seckill.seckill.dto.SeckillExecuteRequest;
+import com.seckill.seckill.dto.SeckillExecuteResponse;
+import com.seckill.seckill.dto.SeckillPathResponse;
+import com.seckill.seckill.dto.SeckillResultResponse;
+import com.seckill.seckill.service.SeckillService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(&quot;/api/seckill&quot;)
+<span class="nc" id="L24">@RequiredArgsConstructor</span>
+public class SeckillController {
+
+    private final SeckillService seckillService;
+
+    @RateLimit(scene = RateLimitScene.SECKILL_PATH)
+    @GetMapping(&quot;/path/{activityId}&quot;)
+    public Result&lt;SeckillPathResponse&gt; getSeckillPath(@PathVariable Long activityId, @RequestParam Long goodsId) {
+<span class="nc" id="L32">        return Result.success(seckillService.getSeckillPath(UserContext.getCurrentUserId(), activityId, goodsId));</span>
+    }
+
+    @RateLimit(scene = RateLimitScene.SECKILL_EXECUTE)
+    @PostMapping(&quot;/do&quot;)
+    public Result&lt;SeckillExecuteResponse&gt; execute(@Valid @RequestBody SeckillExecuteRequest request) {
+<span class="nc" id="L38">        return Result.success(&quot;秒杀请求已提交，正在处理中&quot;, seckillService.execute(UserContext.getCurrentUserId(), request));</span>
+    }
+
+    @GetMapping(&quot;/result/{recordId}&quot;)
+    public Result&lt;SeckillResultResponse&gt; result(@PathVariable Long recordId) {
+<span class="nc" id="L43">        return Result.success(seckillService.getResult(UserContext.getCurrentUserId(), recordId));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

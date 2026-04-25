@@ -1,0 +1,514 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GoodsServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-goods</a> &gt; <a href="index.source.html" class="el_package">com.seckill.goods.service.impl</a> &gt; <span class="el_source">GoodsServiceImpl.java</span></div><h1>GoodsServiceImpl.java</h1><pre class="source lang-java linenums">package com.seckill.goods.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.seckill.common.enums.ResponseCodeEnum;
+import com.seckill.common.exception.BusinessException;
+import com.seckill.common.result.PageResult;
+import com.seckill.common.utils.JsonUtils;
+import com.seckill.goods.dto.AdminGoodsListResponse;
+import com.seckill.goods.dto.AdminGoodsSaveRequest;
+import com.seckill.goods.dto.GoodsDetailResponse;
+import com.seckill.goods.dto.GoodsListResponse;
+import com.seckill.goods.entity.Category;
+import com.seckill.goods.entity.Goods;
+import com.seckill.goods.entity.SeckillActivity;
+import com.seckill.goods.entity.SeckillGoods;
+import com.seckill.goods.mapper.CategoryMapper;
+import com.seckill.goods.mapper.GoodsMapper;
+import com.seckill.goods.mapper.SeckillActivityMapper;
+import com.seckill.goods.mapper.SeckillGoodsMapper;
+import com.seckill.goods.service.GoodsService;
+import com.seckill.infrastructure.utils.RedisUtils;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * 商品领域核心实现。
+ * &lt;p&gt;
+ * 这里同时承载了前台商品查询和管理端商品维护两类能力：
+ * &lt;ul&gt;
+ *     &lt;li&gt;前台读接口优先考虑缓存命中率和接口响应速度&lt;/li&gt;
+ *     &lt;li&gt;管理端写接口优先保证数据正确性，并在写库后统一清理相关缓存&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+@Service
+<span class="fc" id="L52">@RequiredArgsConstructor</span>
+public class GoodsServiceImpl implements GoodsService {
+
+    private static final String GOODS_LIST_KEY_PREFIX = &quot;goods:list:&quot;;
+    private static final String GOODS_LIST_KEY_PATTERN = &quot;goods:list:*&quot;;
+    private static final String GOODS_DETAIL_KEY_PREFIX = &quot;goods:detail:&quot;;
+    private static final String GOODS_NULL_KEY_PREFIX = &quot;goods:null:&quot;;
+    private static final String SECKILL_ACTIVITY_KEY_PREFIX = &quot;seckill:activity:&quot;;
+    private static final String SECKILL_ACTIVITY_LIST_KEY_PATTERN = &quot;seckill:activity:list:*&quot;;
+    private static final long GOODS_LIST_BASE_TTL_SECONDS = 300L;
+    private static final long GOODS_DETAIL_BASE_TTL_SECONDS = 1800L;
+    private static final long GOODS_RANDOM_TTL_SECONDS = 300L;
+    private static final long GOODS_NULL_TTL_SECONDS = 300L;
+    private static final int MAX_PAGE_SIZE = 100;
+
+    private final GoodsMapper goodsMapper;
+    private final CategoryMapper categoryMapper;
+    private final SeckillActivityMapper seckillActivityMapper;
+    private final SeckillGoodsMapper seckillGoodsMapper;
+    private final RedisUtils redisUtils;
+
+    @Override
+    public PageResult&lt;GoodsListResponse&gt; getPublicGoodsList(Long categoryId, String keyword, String sort, Long current, Long size) {
+<span class="fc" id="L75">        long pageNo = normalizeCurrent(current);</span>
+<span class="fc" id="L76">        long pageSize = normalizeSize(size);</span>
+<span class="fc" id="L77">        String cacheKey = buildGoodsListCacheKey(categoryId, keyword, sort, pageNo, pageSize);</span>
+<span class="fc" id="L78">        PageResult&lt;GoodsListResponse&gt; cached = redisUtils.get(cacheKey);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (cached != null) {</span>
+<span class="fc" id="L80">            return cached;</span>
+        }
+
+        // 一级分类需要自动展开到全部子分类，这样前台按大类筛选时不需要额外做树遍历。
+<span class="fc" id="L84">        List&lt;Long&gt; categoryIds = resolveCategoryIds(categoryId);</span>
+<span class="fc" id="L85">        LambdaQueryWrapper&lt;Goods&gt; wrapper = new LambdaQueryWrapper&lt;Goods&gt;()</span>
+<span class="fc" id="L86">                .eq(Goods::getStatus, 1);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (!categoryIds.isEmpty()) {</span>
+<span class="fc" id="L88">            wrapper.in(Goods::getCategoryId, categoryIds);</span>
+        }
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (StringUtils.hasText(keyword)) {</span>
+<span class="fc" id="L91">            wrapper.and(w -&gt; w.like(Goods::getName, keyword.trim())</span>
+<span class="fc" id="L92">                    .or()</span>
+<span class="fc" id="L93">                    .like(Goods::getDescription, keyword.trim()));</span>
+        }
+        // 排序规则和 API 文档保持一致，未知排序值会回退到默认排序，避免前端传错参数导致 SQL 混乱。
+<span class="fc" id="L96">        applyGoodsSort(wrapper, sort);</span>
+
+<span class="fc" id="L98">        Page&lt;Goods&gt; page = goodsMapper.selectPage(new Page&lt;&gt;(pageNo, pageSize), wrapper);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (page.getRecords().isEmpty()) {</span>
+<span class="fc" id="L100">            return PageResult.empty();</span>
+        }
+
+<span class="fc" id="L103">        Map&lt;Long, Category&gt; categoryMap = loadCategoryMap(page.getRecords().stream()</span>
+<span class="fc" id="L104">                .map(Goods::getCategoryId)</span>
+<span class="fc" id="L105">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L106">                .collect(Collectors.toSet()));</span>
+<span class="fc" id="L107">        Map&lt;Long, SeckillGoods&gt; ongoingSeckillMap = loadOngoingSeckillGoodsMap(page.getRecords().stream()</span>
+<span class="fc" id="L108">                .map(Goods::getId)</span>
+<span class="fc" id="L109">                .collect(Collectors.toSet()));</span>
+
+<span class="fc" id="L111">        List&lt;GoodsListResponse&gt; records = page.getRecords().stream()</span>
+<span class="fc" id="L112">                .map(goods -&gt; toPublicListResponse(goods, categoryMap.get(goods.getCategoryId()), ongoingSeckillMap.get(goods.getId())))</span>
+<span class="fc" id="L113">                .toList();</span>
+
+<span class="fc" id="L115">        PageResult&lt;GoodsListResponse&gt; result = PageResult.build(records, page.getTotal(), page.getSize(), page.getCurrent());</span>
+<span class="fc" id="L116">        redisUtils.set(cacheKey, result, randomGoodsListTtl(), TimeUnit.SECONDS);</span>
+<span class="fc" id="L117">        return result;</span>
+    }
+
+    @Override
+    public GoodsDetailResponse getPublicGoodsDetail(Long goodsId) {
+<span class="fc" id="L122">        GoodsDetailResponse cached = redisUtils.get(GOODS_DETAIL_KEY_PREFIX + goodsId);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (cached != null) {</span>
+<span class="fc" id="L124">            return cached;</span>
+        }
+        // 负缓存用于拦住重复查询不存在商品，避免热点脏 ID 持续打到数据库。
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (Boolean.TRUE.equals(redisUtils.hasKey(GOODS_NULL_KEY_PREFIX + goodsId))) {</span>
+<span class="fc" id="L128">            throw new BusinessException(ResponseCodeEnum.GOODS_NOT_FOUND);</span>
+        }
+
+<span class="fc" id="L131">        Goods goods = goodsMapper.selectById(goodsId);</span>
+<span class="pc bpc" id="L132" title="1 of 6 branches missed.">        if (goods == null || goods.getStatus() == null || goods.getStatus() == 0) {</span>
+<span class="fc" id="L133">            redisUtils.set(GOODS_NULL_KEY_PREFIX + goodsId, &quot;1&quot;, GOODS_NULL_TTL_SECONDS, TimeUnit.SECONDS);</span>
+<span class="fc" id="L134">            throw new BusinessException(ResponseCodeEnum.GOODS_NOT_FOUND);</span>
+        }
+
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        Category category = goods.getCategoryId() == null ? null : categoryMapper.selectById(goods.getCategoryId());</span>
+<span class="fc" id="L138">        SeckillSnapshot snapshot = loadNearestAvailableSeckill(goodsId);</span>
+
+<span class="fc" id="L140">        GoodsDetailResponse response = new GoodsDetailResponse();</span>
+<span class="fc" id="L141">        response.setGoodsId(goods.getId());</span>
+<span class="fc" id="L142">        response.setGoodsName(goods.getName());</span>
+<span class="fc" id="L143">        response.setGoodsImg(goods.getCoverImage());</span>
+<span class="fc" id="L144">        response.setGoodsImages(parseImages(goods.getImages()));</span>
+<span class="fc" id="L145">        response.setCategoryId(goods.getCategoryId());</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        response.setCategoryName(category == null ? null : category.getName());</span>
+<span class="fc" id="L147">        response.setDescription(goods.getDescription());</span>
+<span class="fc" id="L148">        response.setDetail(goods.getDetail());</span>
+<span class="fc" id="L149">        response.setPrice(goods.getPrice());</span>
+<span class="fc" id="L150">        response.setStock(goods.getStock());</span>
+<span class="fc" id="L151">        response.setSales(goods.getSales());</span>
+<span class="fc" id="L152">        response.setStatus(goods.getStatus());</span>
+<span class="fc" id="L153">        response.setCreateTime(goods.getCreateTime());</span>
+<span class="fc" id="L154">        response.setUpdateTime(goods.getUpdateTime());</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (snapshot != null) {</span>
+            // 商品详情会挂载“最近且仍可参与”的秒杀活动，前台可直接据此展示倒计时和秒杀价。
+<span class="fc" id="L157">            response.setIsSeckill(1);</span>
+<span class="fc" id="L158">            response.setSeckillPrice(snapshot.seckillGoods().getSeckillPrice());</span>
+<span class="fc" id="L159">            response.setSeckillActivityId(snapshot.activity().getId());</span>
+<span class="fc" id="L160">            response.setSeckillStartTime(snapshot.activity().getStartTime());</span>
+<span class="fc" id="L161">            response.setSeckillEndTime(snapshot.activity().getEndTime());</span>
+        } else {
+<span class="fc" id="L163">            response.setIsSeckill(0);</span>
+        }
+
+<span class="fc" id="L166">        redisUtils.set(GOODS_DETAIL_KEY_PREFIX + goodsId, response, randomGoodsDetailTtl(), TimeUnit.SECONDS);</span>
+<span class="fc" id="L167">        return response;</span>
+    }
+
+    @Override
+    public PageResult&lt;AdminGoodsListResponse&gt; getAdminGoodsList(Long categoryId, String keyword, Integer status, Long current, Long size) {
+<span class="fc" id="L172">        long pageNo = normalizeCurrent(current);</span>
+<span class="fc" id="L173">        long pageSize = normalizeSize(size);</span>
+<span class="fc" id="L174">        List&lt;Long&gt; categoryIds = resolveCategoryIds(categoryId);</span>
+
+<span class="fc" id="L176">        LambdaQueryWrapper&lt;Goods&gt; wrapper = new LambdaQueryWrapper&lt;&gt;();</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (!categoryIds.isEmpty()) {</span>
+<span class="nc" id="L178">            wrapper.in(Goods::getCategoryId, categoryIds);</span>
+        }
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (status != null) {</span>
+<span class="fc" id="L181">            wrapper.eq(Goods::getStatus, status);</span>
+        }
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (StringUtils.hasText(keyword)) {</span>
+<span class="nc" id="L184">            wrapper.and(w -&gt; w.like(Goods::getName, keyword.trim())</span>
+<span class="nc" id="L185">                    .or()</span>
+<span class="nc" id="L186">                    .like(Goods::getDescription, keyword.trim()));</span>
+        }
+<span class="fc" id="L188">        wrapper.orderByDesc(Goods::getCreateTime, Goods::getId);</span>
+
+<span class="fc" id="L190">        Page&lt;Goods&gt; page = goodsMapper.selectPage(new Page&lt;&gt;(pageNo, pageSize), wrapper);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (page.getRecords().isEmpty()) {</span>
+<span class="fc" id="L192">            return PageResult.empty();</span>
+        }
+
+<span class="fc" id="L195">        Map&lt;Long, Category&gt; categoryMap = loadCategoryMap(page.getRecords().stream()</span>
+<span class="fc" id="L196">                .map(Goods::getCategoryId)</span>
+<span class="fc" id="L197">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L198">                .collect(Collectors.toSet()));</span>
+
+<span class="fc" id="L200">        List&lt;AdminGoodsListResponse&gt; records = page.getRecords().stream()</span>
+<span class="fc" id="L201">                .map(goods -&gt; toAdminListResponse(goods, categoryMap.get(goods.getCategoryId())))</span>
+<span class="fc" id="L202">                .toList();</span>
+<span class="fc" id="L203">        return PageResult.build(records, page.getTotal(), page.getSize(), page.getCurrent());</span>
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createGoods(AdminGoodsSaveRequest request) {
+<span class="fc" id="L209">        Category category = validateLeafCategory(request.getCategoryId());</span>
+
+<span class="fc" id="L211">        Goods goods = new Goods();</span>
+<span class="fc" id="L212">        applyGoodsRequest(goods, request);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (request.getStatus() == null) {</span>
+            // 管理端新增商品默认下架，避免未审核/未完善信息的商品直接暴露到前台。
+<span class="fc" id="L215">            goods.setStatus(0);</span>
+        }
+<span class="fc" id="L217">        goodsMapper.insert(goods);</span>
+
+<span class="fc" id="L219">        clearGoodsCaches(goods.getId(), category.getId());</span>
+<span class="fc" id="L220">        return goods.getId();</span>
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateGoods(Long goodsId, AdminGoodsSaveRequest request) {
+<span class="fc" id="L226">        Goods existing = requireGoods(goodsId);</span>
+<span class="fc" id="L227">        validateLeafCategory(request.getCategoryId());</span>
+
+<span class="fc" id="L229">        applyGoodsRequest(existing, request);</span>
+<span class="fc" id="L230">        goodsMapper.updateById(existing);</span>
+<span class="fc" id="L231">        clearGoodsCaches(goodsId, existing.getCategoryId());</span>
+<span class="fc" id="L232">    }</span>
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateGoodsStatus(Long goodsId, Integer status) {
+<span class="fc" id="L237">        Goods goods = requireGoods(goodsId);</span>
+<span class="pc bpc" id="L238" title="2 of 6 branches missed.">        if (status != null &amp;&amp; status == 0 &amp;&amp; hasOngoingActivity(goodsId)) {</span>
+<span class="fc" id="L239">            throw new BusinessException(ResponseCodeEnum.BAD_REQUEST, &quot;正在参与秒杀活动的商品不允许下架&quot;);</span>
+        }
+
+<span class="fc" id="L242">        goods.setStatus(status);</span>
+<span class="fc" id="L243">        goodsMapper.updateById(goods);</span>
+<span class="fc" id="L244">        clearGoodsCaches(goodsId, goods.getCategoryId());</span>
+<span class="fc" id="L245">    }</span>
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteGoods(Long goodsId) {
+<span class="fc" id="L250">        Goods goods = requireGoods(goodsId);</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (hasOngoingActivity(goodsId)) {</span>
+<span class="fc" id="L252">            throw new BusinessException(ResponseCodeEnum.BAD_REQUEST, &quot;该商品正在参与秒杀活动，无法删除&quot;);</span>
+        }
+
+<span class="fc" id="L255">        goodsMapper.deleteById(goodsId);</span>
+<span class="fc" id="L256">        clearGoodsCaches(goodsId, goods.getCategoryId());</span>
+<span class="fc" id="L257">    }</span>
+
+    private void applyGoodsRequest(Goods goods, AdminGoodsSaveRequest request) {
+<span class="fc" id="L260">        goods.setName(request.getGoodsName());</span>
+<span class="fc" id="L261">        goods.setCategoryId(request.getCategoryId());</span>
+<span class="fc" id="L262">        goods.setDescription(request.getDescription());</span>
+<span class="fc" id="L263">        goods.setDetail(request.getDetail());</span>
+<span class="fc" id="L264">        goods.setPrice(request.getPrice());</span>
+<span class="fc" id="L265">        goods.setStock(request.getStock());</span>
+<span class="fc" id="L266">        goods.setCoverImage(request.getCoverImage());</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        goods.setImages(JsonUtils.toJsonString(request.getGoodsImages() == null ? Collections.emptyList() : request.getGoodsImages()));</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        goods.setStatus(request.getStatus() == null ? goods.getStatus() : request.getStatus());</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">        if (goods.getSales() == null) {</span>
+<span class="fc" id="L270">            goods.setSales(0);</span>
+        }
+<span class="fc" id="L272">    }</span>
+
+    private Goods requireGoods(Long goodsId) {
+<span class="fc" id="L275">        Goods goods = goodsMapper.selectById(goodsId);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (goods == null) {</span>
+<span class="fc" id="L277">            throw new BusinessException(ResponseCodeEnum.GOODS_NOT_FOUND);</span>
+        }
+<span class="fc" id="L279">        return goods;</span>
+    }
+
+    private Category validateLeafCategory(Long categoryId) {
+<span class="fc" id="L283">        Category category = categoryMapper.selectById(categoryId);</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (category == null) {</span>
+<span class="fc" id="L285">            throw new BusinessException(ResponseCodeEnum.CATEGORY_NOT_FOUND);</span>
+        }
+        // 商品只允许挂在二级分类下，保证前台列表和后台统计口径稳定。
+<span class="pc bpc" id="L288" title="1 of 4 branches missed.">        if (category.getParentId() == null || category.getParentId() == 0L) {</span>
+<span class="fc" id="L289">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;商品必须挂在二级分类下&quot;);</span>
+        }
+<span class="fc" id="L291">        return category;</span>
+    }
+
+    private List&lt;Long&gt; resolveCategoryIds(Long categoryId) {
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        if (categoryId == null) {</span>
+<span class="fc" id="L296">            return Collections.emptyList();</span>
+        }
+
+<span class="fc" id="L299">        Category category = categoryMapper.selectById(categoryId);</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (category == null) {</span>
+<span class="fc" id="L301">            throw new BusinessException(ResponseCodeEnum.CATEGORY_NOT_FOUND);</span>
+        }
+
+<span class="pc bpc" id="L304" title="1 of 4 branches missed.">        if (category.getParentId() == null || category.getParentId() == 0L) {</span>
+<span class="fc" id="L305">            List&lt;Category&gt; children = categoryMapper.selectList(new LambdaQueryWrapper&lt;Category&gt;()</span>
+<span class="fc" id="L306">                    .select(Category::getId)</span>
+<span class="fc" id="L307">                    .eq(Category::getParentId, categoryId));</span>
+<span class="fc" id="L308">            Set&lt;Long&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L309">            ids.add(categoryId);</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            for (Category child : children) {</span>
+<span class="fc" id="L311">                ids.add(child.getId());</span>
+<span class="fc" id="L312">            }</span>
+<span class="fc" id="L313">            return new ArrayList&lt;&gt;(ids);</span>
+        }
+<span class="fc" id="L315">        return Collections.singletonList(categoryId);</span>
+    }
+
+    private void applyGoodsSort(LambdaQueryWrapper&lt;Goods&gt; wrapper, String sort) {
+<span class="pc bpc" id="L319" title="1 of 4 branches missed.">        if (!StringUtils.hasText(sort) || &quot;default&quot;.equals(sort)) {</span>
+<span class="fc" id="L320">            wrapper.orderByDesc(Goods::getCreateTime, Goods::getId);</span>
+<span class="fc" id="L321">            return;</span>
+        }
+
+<span class="pc bpc" id="L324" title="4 of 5 branches missed.">        switch (sort) {</span>
+<span class="nc" id="L325">            case &quot;priceAsc&quot; -&gt; wrapper.orderByAsc(Goods::getPrice, Goods::getId);</span>
+<span class="nc" id="L326">            case &quot;priceDesc&quot; -&gt; wrapper.orderByDesc(Goods::getPrice, Goods::getId);</span>
+<span class="nc" id="L327">            case &quot;salesDesc&quot; -&gt; wrapper.orderByDesc(Goods::getSales, Goods::getId);</span>
+<span class="nc" id="L328">            case &quot;createTimeDesc&quot; -&gt; wrapper.orderByDesc(Goods::getCreateTime, Goods::getId);</span>
+<span class="fc" id="L329">            default -&gt; wrapper.orderByDesc(Goods::getCreateTime, Goods::getId);</span>
+        }
+<span class="fc" id="L331">    }</span>
+
+    private Map&lt;Long, Category&gt; loadCategoryMap(Set&lt;Long&gt; categoryIds) {
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        if (categoryIds.isEmpty()) {</span>
+<span class="nc" id="L335">            return Collections.emptyMap();</span>
+        }
+<span class="fc" id="L337">        return categoryMapper.selectBatchIds(categoryIds).stream()</span>
+<span class="fc" id="L338">                .collect(Collectors.toMap(Category::getId, Function.identity()));</span>
+    }
+
+    private Map&lt;Long, SeckillGoods&gt; loadOngoingSeckillGoodsMap(Set&lt;Long&gt; goodsIds) {
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">        if (goodsIds.isEmpty()) {</span>
+<span class="nc" id="L343">            return Collections.emptyMap();</span>
+        }
+
+<span class="fc" id="L346">        LocalDateTime now = LocalDateTime.now();</span>
+        // 商品列表只需要展示“正在秒杀”的标记，因此这里只查当前窗口内的活动，避免列表页挂载过多无效信息。
+<span class="fc" id="L348">        List&lt;SeckillActivity&gt; activities = seckillActivityMapper.selectList(new LambdaQueryWrapper&lt;SeckillActivity&gt;()</span>
+<span class="fc" id="L349">                .select(SeckillActivity::getId)</span>
+<span class="fc" id="L350">                .ne(SeckillActivity::getStatus, 3)</span>
+<span class="fc" id="L351">                .le(SeckillActivity::getStartTime, now)</span>
+<span class="fc" id="L352">                .ge(SeckillActivity::getEndTime, now));</span>
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">        if (activities.isEmpty()) {</span>
+<span class="fc" id="L354">            return Collections.emptyMap();</span>
+        }
+
+<span class="nc" id="L357">        List&lt;Long&gt; activityIds = activities.stream().map(SeckillActivity::getId).toList();</span>
+<span class="nc" id="L358">        List&lt;SeckillGoods&gt; seckillGoodsList = seckillGoodsMapper.selectList(new LambdaQueryWrapper&lt;SeckillGoods&gt;()</span>
+<span class="nc" id="L359">                .in(SeckillGoods::getActivityId, activityIds)</span>
+<span class="nc" id="L360">                .in(SeckillGoods::getGoodsId, goodsIds));</span>
+
+<span class="nc" id="L362">        Map&lt;Long, SeckillGoods&gt; result = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">        for (SeckillGoods seckillGoods : seckillGoodsList) {</span>
+<span class="nc" id="L364">            result.putIfAbsent(seckillGoods.getGoodsId(), seckillGoods);</span>
+<span class="nc" id="L365">        }</span>
+<span class="nc" id="L366">        return result;</span>
+    }
+
+    private SeckillSnapshot loadNearestAvailableSeckill(Long goodsId) {
+<span class="fc" id="L370">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L371">        List&lt;SeckillGoods&gt; seckillGoodsList = seckillGoodsMapper.selectList(new LambdaQueryWrapper&lt;SeckillGoods&gt;()</span>
+<span class="fc" id="L372">                .eq(SeckillGoods::getGoodsId, goodsId)</span>
+<span class="fc" id="L373">                .orderByAsc(SeckillGoods::getActivityId));</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        if (seckillGoodsList.isEmpty()) {</span>
+<span class="fc" id="L375">            return null;</span>
+        }
+
+<span class="fc" id="L378">        List&lt;Long&gt; activityIds = seckillGoodsList.stream().map(SeckillGoods::getActivityId).distinct().toList();</span>
+<span class="fc" id="L379">        Map&lt;Long, SeckillActivity&gt; activityMap = seckillActivityMapper.selectBatchIds(activityIds).stream()</span>
+<span class="pc bpc" id="L380" title="2 of 4 branches missed.">                .filter(activity -&gt; activity.getStatus() == null || activity.getStatus() != 3)</span>
+<span class="fc" id="L381">                .collect(Collectors.toMap(SeckillActivity::getId, Function.identity()));</span>
+
+<span class="fc" id="L383">        SeckillSnapshot candidate = null;</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        for (SeckillGoods seckillGoods : seckillGoodsList) {</span>
+<span class="fc" id="L385">            SeckillActivity activity = activityMap.get(seckillGoods.getActivityId());</span>
+<span class="pc bpc" id="L386" title="3 of 6 branches missed.">            if (activity == null || activity.getEndTime() == null || activity.getEndTime().isBefore(now)) {</span>
+<span class="nc" id="L387">                continue;</span>
+            }
+            // 详情页优先挂载离当前时间最近、且还未结束的活动，兼顾进行中和即将开始的场景。
+<span class="pc bpc" id="L390" title="3 of 4 branches missed.">            if (candidate == null || activity.getStartTime().isBefore(candidate.activity().getStartTime())) {</span>
+<span class="fc" id="L391">                candidate = new SeckillSnapshot(activity, seckillGoods);</span>
+            }
+<span class="fc" id="L393">        }</span>
+<span class="fc" id="L394">        return candidate;</span>
+    }
+
+    private GoodsListResponse toPublicListResponse(Goods goods, Category category, SeckillGoods seckillGoods) {
+<span class="fc" id="L398">        GoodsListResponse response = new GoodsListResponse();</span>
+<span class="fc" id="L399">        response.setGoodsId(goods.getId());</span>
+<span class="fc" id="L400">        response.setGoodsName(goods.getName());</span>
+<span class="fc" id="L401">        response.setCoverImage(goods.getCoverImage());</span>
+<span class="fc" id="L402">        response.setCategoryId(goods.getCategoryId());</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        response.setCategoryName(category == null ? null : category.getName());</span>
+<span class="fc" id="L404">        response.setPrice(goods.getPrice());</span>
+<span class="fc" id="L405">        response.setStock(goods.getStock());</span>
+<span class="fc" id="L406">        response.setSales(goods.getSales());</span>
+<span class="fc" id="L407">        response.setStatus(goods.getStatus());</span>
+<span class="fc" id="L408">        response.setCreateTime(goods.getCreateTime());</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">        if (seckillGoods != null) {</span>
+<span class="nc" id="L410">            response.setIsSeckill(1);</span>
+<span class="nc" id="L411">            response.setSeckillPrice(seckillGoods.getSeckillPrice());</span>
+        } else {
+<span class="fc" id="L413">            response.setIsSeckill(0);</span>
+        }
+<span class="fc" id="L415">        return response;</span>
+    }
+
+    private AdminGoodsListResponse toAdminListResponse(Goods goods, Category category) {
+<span class="fc" id="L419">        AdminGoodsListResponse response = new AdminGoodsListResponse();</span>
+<span class="fc" id="L420">        response.setGoodsId(goods.getId());</span>
+<span class="fc" id="L421">        response.setGoodsName(goods.getName());</span>
+<span class="fc" id="L422">        response.setGoodsImg(goods.getCoverImage());</span>
+<span class="fc" id="L423">        response.setCategoryId(goods.getCategoryId());</span>
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">        response.setCategoryName(category == null ? null : category.getName());</span>
+<span class="fc" id="L425">        response.setPrice(goods.getPrice());</span>
+<span class="fc" id="L426">        response.setStock(goods.getStock());</span>
+<span class="fc" id="L427">        response.setSales(goods.getSales());</span>
+<span class="fc" id="L428">        response.setStatus(goods.getStatus());</span>
+<span class="pc bpc" id="L429" title="2 of 4 branches missed.">        response.setStatusDesc(goods.getStatus() != null &amp;&amp; goods.getStatus() == 1 ? &quot;上架&quot; : &quot;下架&quot;);</span>
+<span class="fc" id="L430">        response.setCreateTime(goods.getCreateTime());</span>
+<span class="fc" id="L431">        response.setUpdateTime(goods.getUpdateTime());</span>
+<span class="fc" id="L432">        return response;</span>
+    }
+
+    private List&lt;String&gt; parseImages(String images) {
+<span class="fc" id="L436">        List&lt;String&gt; list = JsonUtils.parseList(images, String.class);</span>
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">        return list == null ? Collections.emptyList() : list;</span>
+    }
+
+    private boolean hasOngoingActivity(Long goodsId) {
+<span class="fc" id="L441">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L442">        List&lt;SeckillGoods&gt; seckillGoodsList = seckillGoodsMapper.selectList(new LambdaQueryWrapper&lt;SeckillGoods&gt;()</span>
+<span class="fc" id="L443">                .eq(SeckillGoods::getGoodsId, goodsId));</span>
+<span class="fc bfc" id="L444" title="All 2 branches covered.">        if (seckillGoodsList.isEmpty()) {</span>
+<span class="fc" id="L445">            return false;</span>
+        }
+        // 下架/删除商品前必须校验是否参与进行中的活动，避免活动页和商品状态出现不一致。
+<span class="fc" id="L448">        List&lt;Long&gt; activityIds = seckillGoodsList.stream().map(SeckillGoods::getActivityId).distinct().toList();</span>
+<span class="fc" id="L449">        Long count = seckillActivityMapper.selectCount(new LambdaQueryWrapper&lt;SeckillActivity&gt;()</span>
+<span class="fc" id="L450">                .in(SeckillActivity::getId, activityIds)</span>
+<span class="fc" id="L451">                .ne(SeckillActivity::getStatus, 3)</span>
+<span class="fc" id="L452">                .le(SeckillActivity::getStartTime, now)</span>
+<span class="fc" id="L453">                .ge(SeckillActivity::getEndTime, now));</span>
+<span class="pc bpc" id="L454" title="2 of 4 branches missed.">        return count != null &amp;&amp; count &gt; 0;</span>
+    }
+
+    private void clearGoodsCaches(Long goodsId, Long categoryId) {
+<span class="fc" id="L458">        List&lt;String&gt; keysToDelete = new java.util.ArrayList&lt;&gt;();</span>
+<span class="fc" id="L459">        keysToDelete.add(GOODS_DETAIL_KEY_PREFIX + goodsId);</span>
+<span class="fc" id="L460">        keysToDelete.add(GOODS_NULL_KEY_PREFIX + goodsId);</span>
+<span class="fc" id="L461">        redisUtils.pipelineDelete(keysToDelete);</span>
+<span class="fc" id="L462">        redisUtils.deleteByPattern(GOODS_LIST_KEY_PATTERN);</span>
+<span class="fc" id="L463">        redisUtils.deleteByPattern(SECKILL_ACTIVITY_LIST_KEY_PATTERN);</span>
+
+        // 商品一旦被修改，关联活动详情中的商品价格/库存文案也可能失效，因此顺手清掉活动详情缓存。
+<span class="fc" id="L466">        List&lt;SeckillGoods&gt; seckillGoodsList = seckillGoodsMapper.selectList(new LambdaQueryWrapper&lt;SeckillGoods&gt;()</span>
+<span class="fc" id="L467">                .eq(SeckillGoods::getGoodsId, goodsId));</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        if (!seckillGoodsList.isEmpty()) {</span>
+<span class="nc" id="L469">            List&lt;String&gt; activityKeys = seckillGoodsList.stream()</span>
+<span class="nc" id="L470">                    .map(sg -&gt; SECKILL_ACTIVITY_KEY_PREFIX + sg.getActivityId())</span>
+<span class="nc" id="L471">                    .distinct()</span>
+<span class="nc" id="L472">                    .toList();</span>
+<span class="nc" id="L473">            redisUtils.pipelineDelete(activityKeys);</span>
+        }
+
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">        if (categoryId != null) {</span>
+            // 分类树缓存粒度较粗，商品分类变更后直接整棵树失效，保证前台分类数据一致。
+<span class="fc" id="L478">            redisUtils.delete(&quot;category:tree&quot;);</span>
+        }
+<span class="fc" id="L480">    }</span>
+
+    private String buildGoodsListCacheKey(Long categoryId, String keyword, String sort, long current, long size) {
+<span class="fc" id="L483">        return GOODS_LIST_KEY_PREFIX</span>
+<span class="fc bfc" id="L484" title="All 2 branches covered.">                + (categoryId == null ? &quot;all&quot; : categoryId) + &quot;:&quot;</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">                + (StringUtils.hasText(keyword) ? keyword.trim() : &quot;all&quot;) + &quot;:&quot;</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">                + (StringUtils.hasText(sort) ? sort : &quot;default&quot;) + &quot;:&quot;</span>
+                + current + &quot;:&quot; + size;
+    }
+
+    private long randomGoodsListTtl() {
+<span class="fc" id="L491">        return GOODS_LIST_BASE_TTL_SECONDS</span>
+<span class="fc" id="L492">                + ThreadLocalRandom.current().nextLong(GOODS_RANDOM_TTL_SECONDS + 1);</span>
+    }
+
+    private long randomGoodsDetailTtl() {
+<span class="fc" id="L496">        return GOODS_DETAIL_BASE_TTL_SECONDS</span>
+<span class="fc" id="L497">                + ThreadLocalRandom.current().nextLong(GOODS_RANDOM_TTL_SECONDS + 1);</span>
+    }
+
+    private long normalizeCurrent(Long current) {
+<span class="pc bpc" id="L501" title="2 of 4 branches missed.">        return current == null || current &lt; 1 ? 1L : current;</span>
+    }
+
+    private long normalizeSize(Long size) {
+<span class="pc bpc" id="L505" title="2 of 4 branches missed.">        if (size == null || size &lt; 1) {</span>
+<span class="nc" id="L506">            return 10L;</span>
+        }
+<span class="fc" id="L508">        return Math.min(size, MAX_PAGE_SIZE);</span>
+    }
+
+<span class="fc" id="L511">    private record SeckillSnapshot(SeckillActivity activity, SeckillGoods seckillGoods) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

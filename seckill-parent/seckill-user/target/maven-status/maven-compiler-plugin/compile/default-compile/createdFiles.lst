@@ -13,7 +13,9 @@ com/seckill/user/service/UserService.class
 com/seckill/user/controller/AddressController.class
 com/seckill/user/dto/UserRegisterRequest.class
 com/seckill/user/mapper/UserMapper.class
+com/seckill/user/service/UserAdminService.class
 com/seckill/user/dto/UserRegisterResponse.class
+com/seckill/user/service/impl/UserAdminServiceImpl.class
 com/seckill/user/entity/User.class
 com/seckill/user/dto/TokenRefreshRequest.class
 com/seckill/user/dto/UserUpdateRequest.class

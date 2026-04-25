@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminSeckillServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-admin</a> &gt; <a href="index.source.html" class="el_package">com.seckill.admin.service.impl</a> &gt; <span class="el_source">AdminSeckillServiceImpl.java</span></div><h1>AdminSeckillServiceImpl.java</h1><pre class="source lang-java linenums">package com.seckill.admin.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.seckill.admin.dto.seckill.AdminSeckillActivityDetailResponse;
+import com.seckill.admin.dto.seckill.AdminSeckillActivityRequest;
+import com.seckill.admin.dto.seckill.AdminSeckillActivityResponse;
+import com.seckill.admin.dto.seckill.AdminSeckillGoodsItemRequest;
+import com.seckill.admin.dto.seckill.AdminSeckillStatisticsResponse;
+import com.seckill.admin.service.AdminSeckillService;
+import com.seckill.common.enums.ResponseCodeEnum;
+import com.seckill.common.exception.BusinessException;
+import com.seckill.common.result.PageResult;
+import com.seckill.goods.entity.Goods;
+import com.seckill.goods.entity.SeckillActivity;
+import com.seckill.goods.entity.SeckillGoods;
+import com.seckill.goods.mapper.GoodsMapper;
+import com.seckill.goods.mapper.SeckillActivityMapper;
+import com.seckill.goods.mapper.SeckillGoodsMapper;
+import com.seckill.infrastructure.utils.RedisUtils;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * 管理端秒杀活动服务实现。
+ */
+@Service
+<span class="fc" id="L38">@RequiredArgsConstructor</span>
+public class AdminSeckillServiceImpl implements AdminSeckillService {
+
+    private final SeckillActivityMapper seckillActivityMapper;
+    private final SeckillGoodsMapper seckillGoodsMapper;
+    private final GoodsMapper goodsMapper;
+    private final RedisUtils redisUtils;
+
+    @Override
+    public PageResult&lt;AdminSeckillActivityResponse&gt; getActivityList(Integer status, Long current, Long size) {
+<span class="fc" id="L48">        LambdaQueryWrapper&lt;SeckillActivity&gt; wrapper = new LambdaQueryWrapper&lt;&gt;();</span>
+        
+        // 根据状态筛选
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        if (status != null &amp;&amp; status &gt; 0) {</span>
+<span class="fc" id="L52">            LocalDateTime now = LocalDateTime.now();</span>
+<span class="pc bpc" id="L53" title="3 of 4 branches missed.">            switch (status) {</span>
+<span class="nc" id="L54">                case 1 -&gt; wrapper.gt(SeckillActivity::getStartTime, now); // 未开始</span>
+<span class="fc" id="L55">                case 2 -&gt; wrapper.le(SeckillActivity::getStartTime, now)</span>
+<span class="fc" id="L56">                               .ge(SeckillActivity::getEndTime, now); // 进行中</span>
+<span class="nc" id="L57">                case 3 -&gt; wrapper.lt(SeckillActivity::getEndTime, now); // 已结束</span>
+            }
+        }
+        
+<span class="fc" id="L61">        wrapper.orderByDesc(SeckillActivity::getCreateTime);</span>
+        
+<span class="fc" id="L63">        long total = seckillActivityMapper.selectCount(wrapper);</span>
+<span class="fc" id="L64">        long offset = (current - 1) * size;</span>
+        
+<span class="fc" id="L66">        List&lt;SeckillActivity&gt; activities = seckillActivityMapper.selectList(</span>
+<span class="fc" id="L67">                wrapper.last(&quot;LIMIT &quot; + offset + &quot;, &quot; + size));</span>
+        
+<span class="fc" id="L69">        List&lt;AdminSeckillActivityResponse&gt; records = activities.stream()</span>
+<span class="fc" id="L70">                .map(this::convertToListResponse)</span>
+<span class="fc" id="L71">                .collect(Collectors.toList());</span>
+        
+<span class="fc" id="L73">        PageResult&lt;AdminSeckillActivityResponse&gt; result = new PageResult&lt;&gt;();</span>
+<span class="fc" id="L74">        result.setRecords(records);</span>
+<span class="fc" id="L75">        result.setTotal(total);</span>
+<span class="fc" id="L76">        result.setSize(size);</span>
+<span class="fc" id="L77">        result.setCurrent(current);</span>
+<span class="fc" id="L78">        result.setPages((total + size - 1) / size);</span>
+        
+<span class="fc" id="L80">        return result;</span>
+    }
+
+    @Override
+    public AdminSeckillActivityDetailResponse getActivityDetail(Long activityId) {
+<span class="fc" id="L85">        SeckillActivity activity = seckillActivityMapper.selectById(activityId);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (activity == null) {</span>
+<span class="fc" id="L87">            throw new BusinessException(ResponseCodeEnum.SECKILL_NOT_FOUND);</span>
+        }
+
+<span class="fc" id="L90">        return convertToDetailResponse(activity);</span>
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createActivity(AdminSeckillActivityRequest request) {
+        // 校验时间
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (request.getEndTime().isBefore(request.getStartTime())) {</span>
+<span class="fc" id="L98">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;活动结束时间必须大于开始时间&quot;);</span>
+        }
+        
+        // 创建活动
+<span class="fc" id="L102">        SeckillActivity activity = new SeckillActivity();</span>
+<span class="fc" id="L103">        activity.setActivityName(request.getActivityName());</span>
+<span class="fc" id="L104">        activity.setDescription(request.getDescription());</span>
+<span class="fc" id="L105">        activity.setActivityImg(request.getActivityImg());</span>
+<span class="fc" id="L106">        activity.setStartTime(request.getStartTime());</span>
+<span class="fc" id="L107">        activity.setEndTime(request.getEndTime());</span>
+<span class="fc" id="L108">        activity.setStatus(0);</span>
+<span class="fc" id="L109">        activity.setCreateTime(LocalDateTime.now());</span>
+<span class="fc" id="L110">        activity.setUpdateTime(LocalDateTime.now());</span>
+        
+<span class="fc" id="L112">        seckillActivityMapper.insert(activity);</span>
+        
+        // 创建活动商品
+<span class="fc" id="L115">        createSeckillGoods(activity.getId(), request.getGoodsList());</span>
+        
+<span class="fc" id="L117">        return activity.getId();</span>
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateActivity(AdminSeckillActivityRequest request) {
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (request.getActivityId() == null) {</span>
+<span class="fc" id="L124">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;活动ID不能为空&quot;);</span>
+        }
+        
+<span class="fc" id="L127">        SeckillActivity activity = seckillActivityMapper.selectById(request.getActivityId());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (activity == null) {</span>
+<span class="fc" id="L129">            throw new BusinessException(ResponseCodeEnum.SECKILL_NOT_FOUND);</span>
+        }
+
+        // 进行中的活动不允许修改
+<span class="fc" id="L133">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="pc bpc" id="L134" title="1 of 4 branches missed.">        if (activity.getStartTime().isBefore(now) &amp;&amp; activity.getEndTime().isAfter(now)) {</span>
+<span class="fc" id="L135">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;进行中的活动不允许修改&quot;);</span>
+        }
+        
+        // 校验时间
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (request.getEndTime().isBefore(request.getStartTime())) {</span>
+<span class="fc" id="L140">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;活动结束时间必须大于开始时间&quot;);</span>
+        }
+        
+        // 更新活动
+<span class="fc" id="L144">        activity.setActivityName(request.getActivityName());</span>
+<span class="fc" id="L145">        activity.setDescription(request.getDescription());</span>
+<span class="fc" id="L146">        activity.setActivityImg(request.getActivityImg());</span>
+<span class="fc" id="L147">        activity.setStartTime(request.getStartTime());</span>
+<span class="fc" id="L148">        activity.setEndTime(request.getEndTime());</span>
+<span class="fc" id="L149">        activity.setUpdateTime(LocalDateTime.now());</span>
+        
+<span class="fc" id="L151">        seckillActivityMapper.updateById(activity);</span>
+        
+        // 删除旧商品关联，创建新的
+<span class="fc" id="L154">        LambdaQueryWrapper&lt;SeckillGoods&gt; wrapper = new LambdaQueryWrapper&lt;&gt;();</span>
+<span class="fc" id="L155">        wrapper.eq(SeckillGoods::getActivityId, activity.getId());</span>
+<span class="fc" id="L156">        seckillGoodsMapper.delete(wrapper);</span>
+        
+<span class="fc" id="L158">        createSeckillGoods(activity.getId(), request.getGoodsList());</span>
+<span class="fc" id="L159">    }</span>
+
+    @Override
+    public AdminSeckillStatisticsResponse getActivityStatistics(Long activityId) {
+<span class="fc" id="L163">        SeckillActivity activity = seckillActivityMapper.selectById(activityId);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (activity == null) {</span>
+<span class="fc" id="L165">            throw new BusinessException(ResponseCodeEnum.SECKILL_NOT_FOUND);</span>
+        }
+        
+        // 获取活动商品
+<span class="fc" id="L169">        LambdaQueryWrapper&lt;SeckillGoods&gt; wrapper = new LambdaQueryWrapper&lt;&gt;();</span>
+<span class="fc" id="L170">        wrapper.eq(SeckillGoods::getActivityId, activityId);</span>
+<span class="fc" id="L171">        List&lt;SeckillGoods&gt; seckillGoodsList = seckillGoodsMapper.selectList(wrapper);</span>
+        
+        // 计算统计信息
+<span class="fc" id="L174">        int totalStock = seckillGoodsList.stream().mapToInt(SeckillGoods::getSeckillStock).sum();</span>
+<span class="fc" id="L175">        int totalSales = seckillGoodsList.stream().mapToInt(SeckillGoods::getSalesCount).sum();</span>
+        
+<span class="fc" id="L177">        AdminSeckillStatisticsResponse response = new AdminSeckillStatisticsResponse();</span>
+<span class="fc" id="L178">        response.setActivityId(activityId);</span>
+<span class="fc" id="L179">        response.setActivityName(activity.getActivityName());</span>
+<span class="fc" id="L180">        response.setStartTime(activity.getStartTime());</span>
+<span class="fc" id="L181">        response.setEndTime(activity.getEndTime());</span>
+<span class="fc" id="L182">        response.setTotalStock(totalStock);</span>
+<span class="fc" id="L183">        response.setTotalSales(totalSales);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        response.setSalesRate(totalStock &gt; 0 ? </span>
+<span class="fc" id="L185">                BigDecimal.valueOf(totalSales).multiply(BigDecimal.valueOf(100))</span>
+<span class="pc" id="L186">                        .divide(BigDecimal.valueOf(totalStock), 2, RoundingMode.HALF_UP).doubleValue() : 0.0);</span>
+        
+        // 计算销售额
+<span class="fc" id="L189">        BigDecimal totalAmount = seckillGoodsList.stream()</span>
+<span class="fc" id="L190">                .map(g -&gt; g.getSeckillPrice().multiply(BigDecimal.valueOf(g.getSalesCount())))</span>
+<span class="fc" id="L191">                .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="fc" id="L192">        response.setTotalAmount(totalAmount);</span>
+        
+        // 商品统计
+<span class="fc" id="L195">        List&lt;AdminSeckillStatisticsResponse.GoodsStatistics&gt; goodsStats = seckillGoodsList.stream()</span>
+<span class="fc" id="L196">                .map(g -&gt; {</span>
+<span class="fc" id="L197">                    AdminSeckillStatisticsResponse.GoodsStatistics stat = </span>
+                            new AdminSeckillStatisticsResponse.GoodsStatistics();
+<span class="fc" id="L199">                    stat.setGoodsId(g.getGoodsId());</span>
+                    
+<span class="fc" id="L201">                    Goods goods = goodsMapper.selectById(g.getGoodsId());</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">                    stat.setGoodsName(goods != null ? goods.getName() : &quot;未知商品&quot;);</span>
+<span class="fc" id="L203">                    stat.setSeckillPrice(g.getSeckillPrice());</span>
+<span class="fc" id="L204">                    stat.setTotalStock(g.getSeckillStock());</span>
+<span class="fc" id="L205">                    stat.setTotalSales(g.getSalesCount());</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                    stat.setSalesRate(g.getSeckillStock() &gt; 0 ?</span>
+<span class="fc" id="L207">                            BigDecimal.valueOf(g.getSalesCount()).multiply(BigDecimal.valueOf(100))</span>
+<span class="pc" id="L208">                                    .divide(BigDecimal.valueOf(g.getSeckillStock()), 2, RoundingMode.HALF_UP).doubleValue() : 0.0);</span>
+<span class="fc" id="L209">                    stat.setTotalAmount(g.getSeckillPrice().multiply(BigDecimal.valueOf(g.getSalesCount())));</span>
+<span class="fc" id="L210">                    return stat;</span>
+                })
+<span class="fc" id="L212">                .collect(Collectors.toList());</span>
+<span class="fc" id="L213">        response.setGoodsStatistics(goodsStats);</span>
+        
+        // 模拟时间分布数据
+<span class="fc" id="L216">        response.setTimeDistribution(generateTimeDistribution(activity));</span>
+        
+        // 模拟请求数据
+<span class="fc" id="L219">        response.setTotalRequests((long) totalSales * 20); // 假设转化率 5%</span>
+<span class="fc" id="L220">        response.setSuccessRate(5.0);</span>
+<span class="fc" id="L221">        response.setAverageResponseTime(156L);</span>
+        
+<span class="fc" id="L223">        return response;</span>
+    }
+
+    private void createSeckillGoods(Long activityId, List&lt;AdminSeckillGoodsItemRequest&gt; goodsList) {
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        for (AdminSeckillGoodsItemRequest item : goodsList) {</span>
+            // 校验商品
+<span class="fc" id="L229">            Goods goods = goodsMapper.selectById(item.getGoodsId());</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            if (goods == null) {</span>
+<span class="fc" id="L231">                throw new BusinessException(ResponseCodeEnum.GOODS_NOT_FOUND);</span>
+            }
+            
+            // 校验秒杀价格
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            if (item.getSeckillPrice().compareTo(goods.getPrice()) &gt;= 0) {</span>
+<span class="fc" id="L236">                throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, </span>
+<span class="fc" id="L237">                        &quot;商品[&quot; + goods.getName() + &quot;]的秒杀价格必须小于原价&quot;);</span>
+            }
+            
+            // 校验库存
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            if (item.getSeckillStock() &gt; goods.getStock()) {</span>
+<span class="fc" id="L242">                throw new BusinessException(ResponseCodeEnum.PARAM_ERROR,</span>
+<span class="fc" id="L243">                        &quot;商品[&quot; + goods.getName() + &quot;]的秒杀库存不能超过商品总库存&quot;);</span>
+            }
+            
+<span class="fc" id="L246">            SeckillGoods seckillGoods = new SeckillGoods();</span>
+<span class="fc" id="L247">            seckillGoods.setActivityId(activityId);</span>
+<span class="fc" id="L248">            seckillGoods.setGoodsId(item.getGoodsId());</span>
+<span class="fc" id="L249">            seckillGoods.setSeckillPrice(item.getSeckillPrice());</span>
+<span class="fc" id="L250">            seckillGoods.setSeckillStock(item.getSeckillStock());</span>
+<span class="fc" id="L251">            seckillGoods.setLimitPerUser(item.getLimitPerUser());</span>
+<span class="fc" id="L252">            seckillGoods.setSalesCount(0);</span>
+<span class="fc" id="L253">            seckillGoods.setCreateTime(LocalDateTime.now());</span>
+<span class="fc" id="L254">            seckillGoods.setUpdateTime(LocalDateTime.now());</span>
+            
+<span class="fc" id="L256">            seckillGoodsMapper.insert(seckillGoods);</span>
+<span class="fc" id="L257">        }</span>
+<span class="fc" id="L258">    }</span>
+
+    private AdminSeckillActivityResponse convertToListResponse(SeckillActivity activity) {
+<span class="fc" id="L261">        AdminSeckillActivityResponse response = new AdminSeckillActivityResponse();</span>
+<span class="fc" id="L262">        response.setActivityId(activity.getId());</span>
+<span class="fc" id="L263">        response.setActivityName(activity.getActivityName());</span>
+<span class="fc" id="L264">        response.setStartTime(activity.getStartTime());</span>
+<span class="fc" id="L265">        response.setEndTime(activity.getEndTime());</span>
+        
+        // 计算状态
+<span class="fc" id="L268">        LocalDateTime now = LocalDateTime.now();</span>
+        int status;
+        String statusDesc;
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        if (now.isBefore(activity.getStartTime())) {</span>
+<span class="fc" id="L272">            status = 1;</span>
+<span class="fc" id="L273">            statusDesc = &quot;未开始&quot;;</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        } else if (now.isAfter(activity.getEndTime())) {</span>
+<span class="nc" id="L275">            status = 3;</span>
+<span class="nc" id="L276">            statusDesc = &quot;已结束&quot;;</span>
+        } else {
+<span class="fc" id="L278">            status = 2;</span>
+<span class="fc" id="L279">            statusDesc = &quot;进行中&quot;;</span>
+        }
+<span class="fc" id="L281">        response.setStatus(status);</span>
+<span class="fc" id="L282">        response.setStatusDesc(statusDesc);</span>
+        
+        // 查询商品统计
+<span class="fc" id="L285">        LambdaQueryWrapper&lt;SeckillGoods&gt; wrapper = new LambdaQueryWrapper&lt;&gt;();</span>
+<span class="fc" id="L286">        wrapper.eq(SeckillGoods::getActivityId, activity.getId());</span>
+<span class="fc" id="L287">        List&lt;SeckillGoods&gt; goodsList = seckillGoodsMapper.selectList(wrapper);</span>
+        
+<span class="fc" id="L289">        response.setGoodsCount(goodsList.size());</span>
+<span class="fc" id="L290">        response.setTotalStock(goodsList.stream().mapToInt(SeckillGoods::getSeckillStock).sum());</span>
+<span class="fc" id="L291">        response.setTotalSales(goodsList.stream().mapToInt(SeckillGoods::getSalesCount).sum());</span>
+<span class="fc" id="L292">        response.setCreateTime(activity.getCreateTime());</span>
+        
+<span class="fc" id="L294">        return response;</span>
+    }
+
+    private AdminSeckillActivityDetailResponse convertToDetailResponse(SeckillActivity activity) {
+<span class="fc" id="L298">        AdminSeckillActivityDetailResponse response = new AdminSeckillActivityDetailResponse();</span>
+<span class="fc" id="L299">        response.setActivityId(activity.getId());</span>
+<span class="fc" id="L300">        response.setActivityName(activity.getActivityName());</span>
+<span class="fc" id="L301">        response.setDescription(activity.getDescription());</span>
+<span class="fc" id="L302">        response.setActivityImg(activity.getActivityImg());</span>
+<span class="fc" id="L303">        response.setStartTime(activity.getStartTime());</span>
+<span class="fc" id="L304">        response.setEndTime(activity.getEndTime());</span>
+        
+        // 计算状态
+<span class="fc" id="L307">        LocalDateTime now = LocalDateTime.now();</span>
+        int status;
+        String statusDesc;
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (now.isBefore(activity.getStartTime())) {</span>
+<span class="fc" id="L311">            status = 1;</span>
+<span class="fc" id="L312">            statusDesc = &quot;未开始&quot;;</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">        } else if (now.isAfter(activity.getEndTime())) {</span>
+<span class="nc" id="L314">            status = 3;</span>
+<span class="nc" id="L315">            statusDesc = &quot;已结束&quot;;</span>
+        } else {
+<span class="nc" id="L317">            status = 2;</span>
+<span class="nc" id="L318">            statusDesc = &quot;进行中&quot;;</span>
+        }
+<span class="fc" id="L320">        response.setStatus(status);</span>
+<span class="fc" id="L321">        response.setStatusDesc(statusDesc);</span>
+        
+        // 默认规则
+<span class="fc" id="L324">        response.setRules(List.of(</span>
+                &quot;每人限购 1 件&quot;,
+                &quot;秒杀商品不支持使用优惠券&quot;,
+                &quot;秒杀订单需在 15 分钟内完成支付&quot;,
+                &quot;秒杀成功后不可取消订单&quot;
+        ));
+        
+        // 查询商品
+<span class="fc" id="L332">        LambdaQueryWrapper&lt;SeckillGoods&gt; wrapper = new LambdaQueryWrapper&lt;&gt;();</span>
+<span class="fc" id="L333">        wrapper.eq(SeckillGoods::getActivityId, activity.getId());</span>
+<span class="fc" id="L334">        List&lt;SeckillGoods&gt; seckillGoodsList = seckillGoodsMapper.selectList(wrapper);</span>
+        
+<span class="fc" id="L336">        List&lt;AdminSeckillActivityDetailResponse.AdminSeckillGoodsDetailResponse&gt; goodsResponses = </span>
+<span class="fc" id="L337">                seckillGoodsList.stream().map(g -&gt; {</span>
+<span class="nc" id="L338">            AdminSeckillActivityDetailResponse.AdminSeckillGoodsDetailResponse gr = </span>
+                    new AdminSeckillActivityDetailResponse.AdminSeckillGoodsDetailResponse();
+<span class="nc" id="L340">            gr.setGoodsId(g.getGoodsId());</span>
+            
+<span class="nc" id="L342">            Goods goods = goodsMapper.selectById(g.getGoodsId());</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">            if (goods != null) {</span>
+<span class="nc" id="L344">                gr.setGoodsName(goods.getName());</span>
+<span class="nc" id="L345">                gr.setGoodsImg(goods.getCoverImage());</span>
+<span class="nc" id="L346">                gr.setOriginalPrice(goods.getPrice());</span>
+            }
+<span class="nc" id="L348">            gr.setSeckillPrice(g.getSeckillPrice());</span>
+<span class="nc" id="L349">            gr.setSeckillStock(g.getSeckillStock());</span>
+<span class="nc" id="L350">            gr.setSalesCount(g.getSalesCount());</span>
+<span class="nc" id="L351">            gr.setLimitPerUser(g.getLimitPerUser());</span>
+<span class="nc" id="L352">            return gr;</span>
+<span class="fc" id="L353">        }).collect(Collectors.toList());</span>
+        
+<span class="fc" id="L355">        response.setGoodsList(goodsResponses);</span>
+<span class="fc" id="L356">        response.setCreateTime(activity.getCreateTime());</span>
+<span class="fc" id="L357">        response.setUpdateTime(activity.getUpdateTime());</span>
+        
+<span class="fc" id="L359">        return response;</span>
+    }
+
+    private List&lt;AdminSeckillStatisticsResponse.TimeDistribution&gt; generateTimeDistribution(SeckillActivity activity) {
+<span class="fc" id="L363">        List&lt;AdminSeckillStatisticsResponse.TimeDistribution&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L364">        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(&quot;HH:mm&quot;);</span>
+        
+<span class="fc" id="L366">        LocalDateTime start = activity.getStartTime();</span>
+<span class="fc" id="L367">        LocalDateTime end = activity.getEndTime();</span>
+        
+        // 生成每分钟的分布数据（模拟数据）
+<span class="fc" id="L370">        int totalMinutes = (int) java.time.Duration.between(start, end).toMinutes();</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        for (int i = 0; i &lt; Math.min(totalMinutes, 10); i++) {</span>
+<span class="fc" id="L372">            AdminSeckillStatisticsResponse.TimeDistribution dist = </span>
+                    new AdminSeckillStatisticsResponse.TimeDistribution();
+<span class="fc" id="L374">            dist.setTime(start.plusMinutes(i).format(formatter));</span>
+            // 模拟递减的销售数据
+<span class="fc" id="L376">            dist.setSales(Math.max(1, 50 - i * 5));</span>
+<span class="fc" id="L377">            list.add(dist);</span>
+        }
+        
+<span class="fc" id="L380">        return list;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -27,6 +27,18 @@
             <artifactId>seckill-infrastructure</artifactId>
         </dependency>
 
+        <!-- Goods Module -->
+        <dependency>
+            <groupId>com.seckill</groupId>
+            <artifactId>seckill-goods</artifactId>
+        </dependency>
+
+        <!-- User Module -->
+        <dependency>
+            <groupId>com.seckill</groupId>
+            <artifactId>seckill-user</artifactId>
+        </dependency>
+
         <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

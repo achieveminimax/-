@@ -15,6 +15,7 @@
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/exception/GlobalExceptionHandler.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/result/PageResult.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/result/Result.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/utils/AdminContext.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/utils/JsonUtils.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/utils/JwtUtils.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/utils/SnowflakeIdWorker.java

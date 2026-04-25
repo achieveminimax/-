@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SeckillRedisKeys.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-seckill</a> &gt; <a href="index.source.html" class="el_package">com.seckill.seckill.support</a> &gt; <span class="el_source">SeckillRedisKeys.java</span></div><h1>SeckillRedisKeys.java</h1><pre class="source lang-java linenums">package com.seckill.seckill.support;
+
+import com.seckill.common.constant.RedisKeyConstant;
+
+public final class SeckillRedisKeys {
+
+    private SeckillRedisKeys() {
+    }
+
+    public static String stock(Long activityId, Long goodsId) {
+<span class="fc" id="L11">        return RedisKeyConstant.SECKILL_STOCK + activityId + &quot;:&quot; + goodsId;</span>
+    }
+
+    public static String path(Long userId, Long activityId, Long goodsId) {
+<span class="fc" id="L15">        return RedisKeyConstant.SECKILL_PATH + userId + &quot;:&quot; + activityId + &quot;:&quot; + goodsId;</span>
+    }
+
+    public static String pathAcquireCount(Long userId, Long activityId, Long goodsId) {
+<span class="fc" id="L19">        return RedisKeyConstant.SECKILL_PATH_COUNT + userId + &quot;:&quot; + activityId + &quot;:&quot; + goodsId;</span>
+    }
+
+    public static String done(Long activityId, Long goodsId) {
+<span class="fc" id="L23">        return RedisKeyConstant.SECKILL_DONE + activityId + &quot;:&quot; + goodsId;</span>
+    }
+
+    public static String result(Long recordId) {
+<span class="fc" id="L27">        return RedisKeyConstant.SECKILL_RESULT + recordId;</span>
+    }
+
+    public static String userRateLimit(String uri, Long userId, long epochSecond) {
+<span class="fc" id="L31">        return RedisKeyConstant.RATE_LIMIT + uri + &quot;:&quot; + userId + &quot;:&quot; + epochSecond;</span>
+    }
+
+    public static String globalRateLimit(String uri, long epochSecond) {
+<span class="fc" id="L35">        return RedisKeyConstant.RATE_LIMIT_GLOBAL + uri + &quot;:&quot; + epochSecond;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

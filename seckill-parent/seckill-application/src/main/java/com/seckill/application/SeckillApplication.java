@@ -5,6 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -13,6 +14,7 @@ import java.net.UnknownHostException;
  * 电商秒杀系统 - 应用启动入口
  */
 @Slf4j
+@EnableScheduling
 @SpringBootApplication(scanBasePackages = "com.seckill")
 public class SeckillApplication {
 

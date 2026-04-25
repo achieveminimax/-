@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SeckillPreheatServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-goods</a> &gt; <a href="index.source.html" class="el_package">com.seckill.goods.service.impl</a> &gt; <span class="el_source">SeckillPreheatServiceImpl.java</span></div><h1>SeckillPreheatServiceImpl.java</h1><pre class="source lang-java linenums">package com.seckill.goods.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.seckill.common.enums.ResponseCodeEnum;
+import com.seckill.common.exception.BusinessException;
+import com.seckill.goods.dto.SeckillActivityDetailResponse;
+import com.seckill.goods.dto.SeckillGoodsItemResponse;
+import com.seckill.goods.entity.Goods;
+import com.seckill.goods.entity.SeckillActivity;
+import com.seckill.goods.entity.SeckillGoods;
+import com.seckill.goods.mapper.GoodsMapper;
+import com.seckill.goods.mapper.SeckillActivityMapper;
+import com.seckill.goods.mapper.SeckillGoodsMapper;
+import com.seckill.goods.service.SeckillPreheatService;
+import com.seckill.infrastructure.utils.RedisUtils;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * 秒杀活动预热服务。
+ * &lt;p&gt;
+ * 预热的目标不是提前执行秒杀逻辑，而是把活动详情和可扣减库存先装载到 Redis，
+ * 这样真正开始抢购时，读流量和库存判断都能优先落在缓存层。
+ */
+<span class="fc" id="L36">@Slf4j</span>
+@Service
+<span class="fc" id="L38">@RequiredArgsConstructor</span>
+public class SeckillPreheatServiceImpl implements SeckillPreheatService {
+
+    private static final String SECKILL_ACTIVITY_KEY_PREFIX = &quot;seckill:activity:&quot;;
+    private static final String SECKILL_ACTIVITY_LIST_KEY_PATTERN = &quot;seckill:activity:list:*&quot;;
+    private static final String SECKILL_STOCK_KEY_PREFIX = &quot;seckill:stock:&quot;;
+
+<span class="fc" id="L45">    private static final List&lt;String&gt; DEFAULT_RULES = List.of(</span>
+            &quot;每人限购 1 件&quot;,
+            &quot;秒杀商品不支持使用优惠券&quot;,
+            &quot;秒杀订单需在 15 分钟内完成支付&quot;,
+            &quot;秒杀成功后请尽快完成支付&quot;
+    );
+
+    private final SeckillActivityMapper seckillActivityMapper;
+    private final SeckillGoodsMapper seckillGoodsMapper;
+    private final GoodsMapper goodsMapper;
+    private final RedisUtils redisUtils;
+
+    @Override
+    public int preheatUpcomingActivities() {
+<span class="fc" id="L59">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L60">        LocalDateTime preheatDeadline = now.plusMinutes(5);</span>
+        // 只扫描未来 5 分钟内即将开始、且未被下架的活动，避免无意义预热占用缓存空间。
+<span class="fc" id="L62">        List&lt;SeckillActivity&gt; activities = seckillActivityMapper.selectList(new LambdaQueryWrapper&lt;SeckillActivity&gt;()</span>
+<span class="fc" id="L63">                .ne(SeckillActivity::getStatus, 3)</span>
+<span class="fc" id="L64">                .ge(SeckillActivity::getEndTime, now)</span>
+<span class="fc" id="L65">                .between(SeckillActivity::getStartTime, now, preheatDeadline)</span>
+<span class="fc" id="L66">                .orderByAsc(SeckillActivity::getStartTime));</span>
+
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (SeckillActivity activity : activities) {</span>
+<span class="fc" id="L69">            preheatActivity(activity.getId());</span>
+<span class="fc" id="L70">        }</span>
+<span class="fc" id="L71">        return activities.size();</span>
+    }
+
+    @Override
+    public void preheatActivity(Long activityId) {
+<span class="fc" id="L76">        SeckillActivity activity = seckillActivityMapper.selectById(activityId);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (activity == null) {</span>
+<span class="fc" id="L78">            throw new BusinessException(ResponseCodeEnum.SECKILL_NOT_FOUND);</span>
+        }
+<span class="pc bpc" id="L80" title="1 of 4 branches missed.">        if (activity.getStatus() != null &amp;&amp; activity.getStatus() == 3) {</span>
+<span class="fc" id="L81">            throw new BusinessException(ResponseCodeEnum.BAD_REQUEST, &quot;已下架活动不允许预热&quot;);</span>
+        }
+
+<span class="fc" id="L84">        List&lt;SeckillGoods&gt; seckillGoodsList = seckillGoodsMapper.selectList(new LambdaQueryWrapper&lt;SeckillGoods&gt;()</span>
+<span class="fc" id="L85">                .eq(SeckillGoods::getActivityId, activityId)</span>
+<span class="fc" id="L86">                .orderByAsc(SeckillGoods::getId));</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (seckillGoodsList.isEmpty()) {</span>
+<span class="fc" id="L88">            throw new BusinessException(ResponseCodeEnum.BAD_REQUEST, &quot;活动下不存在秒杀商品&quot;);</span>
+        }
+
+<span class="fc" id="L91">        Map&lt;Long, Goods&gt; goodsMap = loadGoodsMap(seckillGoodsList.stream()</span>
+<span class="fc" id="L92">                .map(SeckillGoods::getGoodsId)</span>
+<span class="fc" id="L93">                .collect(Collectors.toSet()));</span>
+        // 预热数据至少保留到活动结束后一段时间，给详情页和问题排查预留缓冲窗口。
+<span class="fc" id="L95">        long ttlSeconds = buildPreheatTtlSeconds(activity.getEndTime());</span>
+
+<span class="fc" id="L97">        Map&lt;String, Object&gt; stockKvMap = new java.util.LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (SeckillGoods seckillGoods : seckillGoodsList) {</span>
+<span class="fc" id="L99">            stockKvMap.put(SECKILL_STOCK_KEY_PREFIX + activityId + &quot;:&quot; + seckillGoods.getGoodsId(),</span>
+<span class="fc" id="L100">                    seckillGoods.getSeckillStock());</span>
+<span class="fc" id="L101">        }</span>
+<span class="fc" id="L102">        redisUtils.pipelineSet(stockKvMap, ttlSeconds, TimeUnit.SECONDS);</span>
+
+        // 同步预热活动详情，减少活动开始后第一波详情请求直接打到数据库。
+<span class="fc" id="L105">        SeckillActivityDetailResponse detailResponse = buildActivityDetail(activity, seckillGoodsList, goodsMap);</span>
+<span class="fc" id="L106">        redisUtils.set(SECKILL_ACTIVITY_KEY_PREFIX + activityId, detailResponse, ttlSeconds, TimeUnit.SECONDS);</span>
+        // 活动列表依赖活动详情和库存汇总，单个活动预热后需要让列表缓存统一失效重建。
+<span class="fc" id="L108">        redisUtils.deleteByPattern(SECKILL_ACTIVITY_LIST_KEY_PATTERN);</span>
+
+<span class="fc" id="L110">        log.info(&quot;秒杀活动预热完成, activityId={}, goodsCount={}&quot;, activityId, seckillGoodsList.size());</span>
+<span class="fc" id="L111">    }</span>
+
+    private Map&lt;Long, Goods&gt; loadGoodsMap(Set&lt;Long&gt; goodsIds) {
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (goodsIds.isEmpty()) {</span>
+<span class="nc" id="L115">            return Collections.emptyMap();</span>
+        }
+<span class="fc" id="L117">        return goodsMapper.selectBatchIds(goodsIds).stream()</span>
+<span class="fc" id="L118">                .collect(Collectors.toMap(Goods::getId, Function.identity()));</span>
+    }
+
+    private SeckillActivityDetailResponse buildActivityDetail(SeckillActivity activity,
+                                                              List&lt;SeckillGoods&gt; seckillGoodsList,
+                                                              Map&lt;Long, Goods&gt; goodsMap) {
+<span class="fc" id="L124">        SeckillActivityDetailResponse response = new SeckillActivityDetailResponse();</span>
+<span class="fc" id="L125">        response.setActivityId(activity.getId());</span>
+<span class="fc" id="L126">        response.setActivityName(activity.getActivityName());</span>
+<span class="fc" id="L127">        response.setActivityImg(activity.getActivityImg());</span>
+<span class="fc" id="L128">        response.setDescription(activity.getDescription());</span>
+<span class="fc" id="L129">        response.setStartTime(activity.getStartTime());</span>
+<span class="fc" id="L130">        response.setEndTime(activity.getEndTime());</span>
+<span class="fc" id="L131">        response.setStatus(resolveStatus(activity));</span>
+<span class="fc" id="L132">        response.setStatusDesc(toStatusDesc(response.getStatus()));</span>
+<span class="fc" id="L133">        response.setRules(DEFAULT_RULES);</span>
+<span class="fc" id="L134">        response.setGoodsList(seckillGoodsList.stream()</span>
+<span class="fc" id="L135">                .map(seckillGoods -&gt; toGoodsItem(seckillGoods, goodsMap.get(seckillGoods.getGoodsId())))</span>
+<span class="fc" id="L136">                .toList());</span>
+<span class="fc" id="L137">        return response;</span>
+    }
+
+    private SeckillGoodsItemResponse toGoodsItem(SeckillGoods seckillGoods, Goods goods) {
+<span class="fc" id="L141">        SeckillGoodsItemResponse response = new SeckillGoodsItemResponse();</span>
+<span class="fc" id="L142">        response.setGoodsId(seckillGoods.getGoodsId());</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        response.setGoodsName(goods == null ? null : goods.getName());</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        response.setGoodsImg(goods == null ? null : goods.getCoverImage());</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        response.setOriginalPrice(goods == null ? null : goods.getPrice());</span>
+<span class="fc" id="L146">        response.setSeckillPrice(seckillGoods.getSeckillPrice());</span>
+<span class="fc" id="L147">        response.setTotalStock(seckillGoods.getSeckillStock());</span>
+<span class="fc" id="L148">        response.setRemainStock(seckillGoods.getSeckillStock());</span>
+<span class="fc" id="L149">        response.setStock(seckillGoods.getSeckillStock());</span>
+<span class="fc" id="L150">        response.setLimitPerUser(seckillGoods.getLimitPerUser());</span>
+<span class="fc" id="L151">        response.setSalesCount(seckillGoods.getSalesCount());</span>
+<span class="fc" id="L152">        return response;</span>
+    }
+
+    private int resolveStatus(SeckillActivity activity) {
+<span class="fc" id="L156">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="pc bpc" id="L157" title="2 of 4 branches missed.">        if (activity.getEndTime() != null &amp;&amp; activity.getEndTime().isBefore(now)) {</span>
+<span class="nc" id="L158">            return 3;</span>
+        }
+<span class="pc bpc" id="L160" title="2 of 4 branches missed.">        if (activity.getStartTime() != null &amp;&amp; activity.getStartTime().isAfter(now)) {</span>
+<span class="fc" id="L161">            return 2;</span>
+        }
+<span class="nc" id="L163">        return 1;</span>
+    }
+
+    private String toStatusDesc(Integer status) {
+<span class="pc bpc" id="L167" title="3 of 4 branches missed.">        return switch (status) {</span>
+<span class="nc" id="L168">            case 1 -&gt; &quot;进行中&quot;;</span>
+<span class="fc" id="L169">            case 2 -&gt; &quot;即将开始&quot;;</span>
+<span class="nc" id="L170">            case 3 -&gt; &quot;已结束&quot;;</span>
+<span class="nc" id="L171">            default -&gt; &quot;未知&quot;;</span>
+        };
+    }
+
+    private long buildPreheatTtlSeconds(LocalDateTime endTime) {
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (endTime == null) {</span>
+<span class="nc" id="L177">            return 3600L;</span>
+        }
+        // 统一在活动结束后再多保留 1 小时，兼顾详情页查询和运营排查。
+<span class="fc" id="L180">        long seconds = Duration.between(LocalDateTime.now(), endTime.plusHours(1)).getSeconds();</span>
+<span class="fc" id="L181">        return Math.max(seconds, 600L);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

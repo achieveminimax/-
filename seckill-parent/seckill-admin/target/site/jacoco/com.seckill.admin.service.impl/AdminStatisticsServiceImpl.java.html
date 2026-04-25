@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminStatisticsServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-admin</a> &gt; <a href="index.source.html" class="el_package">com.seckill.admin.service.impl</a> &gt; <span class="el_source">AdminStatisticsServiceImpl.java</span></div><h1>AdminStatisticsServiceImpl.java</h1><pre class="source lang-java linenums">package com.seckill.admin.service.impl;
+
+import com.seckill.admin.dto.stats.DashboardStatsResponse;
+import com.seckill.admin.dto.stats.SalesStatsResponse;
+import com.seckill.admin.dto.stats.TopProductsResponse;
+import com.seckill.admin.mapper.AdminStatisticsMapper;
+import com.seckill.admin.service.AdminStatisticsService;
+import com.seckill.infrastructure.utils.RedisUtils;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+/**
+ * 管理端统计服务实现。
+ */
+@Service
+<span class="fc" id="L26">@RequiredArgsConstructor</span>
+public class AdminStatisticsServiceImpl implements AdminStatisticsService {
+
+    private static final String DASHBOARD_CACHE_KEY = &quot;admin:dashboard&quot;;
+    private static final long DASHBOARD_CACHE_TTL = 300; // 5 分钟
+
+    private final AdminStatisticsMapper adminStatisticsMapper;
+    private final RedisUtils redisUtils;
+
+    @Override
+    public DashboardStatsResponse getDashboardStats() {
+        // 尝试从缓存获取
+<span class="fc" id="L38">        DashboardStatsResponse cached = redisUtils.get(DASHBOARD_CACHE_KEY);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (cached != null) {</span>
+<span class="fc" id="L40">            return cached;</span>
+        }
+
+<span class="fc" id="L43">        DashboardStatsResponse response = new DashboardStatsResponse();</span>
+
+        // 概览统计
+<span class="fc" id="L46">        DashboardStatsResponse.OverviewStats overview = new DashboardStatsResponse.OverviewStats();</span>
+<span class="fc" id="L47">        overview.setTotalUsers(adminStatisticsMapper.countTotalUsers());</span>
+<span class="fc" id="L48">        overview.setTodayNewUsers(adminStatisticsMapper.countTodayNewUsers());</span>
+<span class="fc" id="L49">        overview.setTotalOrders(adminStatisticsMapper.countTotalOrders());</span>
+<span class="fc" id="L50">        overview.setTodayOrders(adminStatisticsMapper.countTodayOrders());</span>
+<span class="fc" id="L51">        overview.setTotalSales(adminStatisticsMapper.sumTotalSales());</span>
+<span class="fc" id="L52">        overview.setTodaySales(adminStatisticsMapper.sumTodaySales());</span>
+<span class="fc" id="L53">        overview.setTotalGoods(adminStatisticsMapper.countTotalGoods());</span>
+<span class="fc" id="L54">        overview.setOnlineGoods(adminStatisticsMapper.countOnlineGoods());</span>
+<span class="fc" id="L55">        overview.setTotalSeckillActivities(adminStatisticsMapper.countTotalActivities());</span>
+<span class="fc" id="L56">        overview.setOngoingActivities(adminStatisticsMapper.countOngoingActivities());</span>
+<span class="fc" id="L57">        response.setOverview(overview);</span>
+
+        // 销售趋势（最近 7 天）
+<span class="fc" id="L60">        LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);</span>
+<span class="fc" id="L61">        List&lt;DashboardStatsResponse.SalesTrendItem&gt; salesTrend = adminStatisticsMapper.selectSalesTrend(sevenDaysAgo);</span>
+        // 补齐缺失的日期
+<span class="fc" id="L63">        response.setSalesTrend(fillMissingDates(salesTrend, 7));</span>
+
+        // 热销商品 Top 10
+<span class="fc" id="L66">        response.setTopSellingGoods(adminStatisticsMapper.selectTopSellingGoods());</span>
+
+        // 最近订单
+<span class="fc" id="L69">        response.setRecentOrders(adminStatisticsMapper.selectRecentOrders());</span>
+
+        // 缓存结果
+<span class="fc" id="L72">        redisUtils.set(DASHBOARD_CACHE_KEY, response, DASHBOARD_CACHE_TTL, TimeUnit.SECONDS);</span>
+
+<span class="fc" id="L74">        return response;</span>
+    }
+
+    @Override
+    public SalesStatsResponse getSalesStats(Integer days) {
+<span class="fc" id="L79">        SalesStatsResponse response = new SalesStatsResponse();</span>
+
+        // 计算日期范围
+<span class="fc" id="L82">        LocalDateTime endDate = LocalDateTime.now().plusDays(1).truncatedTo(ChronoUnit.DAYS);</span>
+<span class="fc" id="L83">        LocalDateTime startDate = endDate.minusDays(days);</span>
+
+        // 查询销售额和订单数
+<span class="fc" id="L86">        List&lt;AdminStatisticsMapper.SalesAmountItem&gt; amountItems = </span>
+<span class="fc" id="L87">                adminStatisticsMapper.selectSalesAmountByDateRange(startDate, endDate);</span>
+<span class="fc" id="L88">        List&lt;AdminStatisticsMapper.SalesCountItem&gt; countItems = </span>
+<span class="fc" id="L89">                adminStatisticsMapper.selectSalesCountByDateRange(startDate, endDate);</span>
+
+        // 构建日期列表
+<span class="fc" id="L92">        List&lt;String&gt; dateList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L93">        List&lt;BigDecimal&gt; amountList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L94">        List&lt;Long&gt; countList = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L96">        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(&quot;MM-dd&quot;);</span>
+        
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (int i = 0; i &lt; days; i++) {</span>
+<span class="fc" id="L99">            LocalDate date = startDate.plusDays(i).toLocalDate();</span>
+<span class="fc" id="L100">            String dateStr = date.format(formatter);</span>
+<span class="fc" id="L101">            dateList.add(dateStr);</span>
+
+            // 查找对应日期的数据
+<span class="fc" id="L104">            String dateKey = date.toString();</span>
+<span class="fc" id="L105">            BigDecimal amount = amountItems.stream()</span>
+<span class="pc" id="L106">                    .filter(item -&gt; item.getDate().equals(dateKey))</span>
+<span class="fc" id="L107">                    .findFirst()</span>
+<span class="fc" id="L108">                    .map(AdminStatisticsMapper.SalesAmountItem::getAmount)</span>
+<span class="fc" id="L109">                    .orElse(BigDecimal.ZERO);</span>
+<span class="fc" id="L110">            amountList.add(amount);</span>
+
+<span class="fc" id="L112">            Long count = countItems.stream()</span>
+<span class="pc" id="L113">                    .filter(item -&gt; item.getDate().equals(dateKey))</span>
+<span class="fc" id="L114">                    .findFirst()</span>
+<span class="fc" id="L115">                    .map(AdminStatisticsMapper.SalesCountItem::getOrderCount)</span>
+<span class="fc" id="L116">                    .orElse(0L);</span>
+<span class="fc" id="L117">            countList.add(count);</span>
+        }
+
+<span class="fc" id="L120">        response.setXAxis(dateList);</span>
+
+        // 构建 series
+<span class="fc" id="L123">        List&lt;SalesStatsResponse.SeriesItem&gt; series = new ArrayList&lt;&gt;();</span>
+        
+<span class="fc" id="L125">        SalesStatsResponse.SeriesItem amountSeries = new SalesStatsResponse.SeriesItem();</span>
+<span class="fc" id="L126">        amountSeries.setName(&quot;销售额&quot;);</span>
+<span class="fc" id="L127">        amountSeries.setType(&quot;line&quot;);</span>
+<span class="fc" id="L128">        amountSeries.setData(amountList);</span>
+<span class="fc" id="L129">        series.add(amountSeries);</span>
+
+<span class="fc" id="L131">        SalesStatsResponse.SeriesItem countSeries = new SalesStatsResponse.SeriesItem();</span>
+<span class="fc" id="L132">        countSeries.setName(&quot;订单数&quot;);</span>
+<span class="fc" id="L133">        countSeries.setType(&quot;bar&quot;);</span>
+        // 将 Long 转换为 BigDecimal
+<span class="fc" id="L135">        countSeries.setData(countList.stream().map(BigDecimal::valueOf).collect(Collectors.toList()));</span>
+<span class="fc" id="L136">        series.add(countSeries);</span>
+
+<span class="fc" id="L138">        response.setSeries(series);</span>
+
+        // 构建 legend
+<span class="fc" id="L141">        SalesStatsResponse.Legend legend = new SalesStatsResponse.Legend();</span>
+<span class="fc" id="L142">        legend.setData(List.of(&quot;销售额&quot;, &quot;订单数&quot;));</span>
+<span class="fc" id="L143">        response.setLegend(legend);</span>
+
+<span class="fc" id="L145">        return response;</span>
+    }
+
+    @Override
+    public TopProductsResponse getTopProducts() {
+<span class="fc" id="L150">        TopProductsResponse response = new TopProductsResponse();</span>
+
+<span class="fc" id="L152">        List&lt;AdminStatisticsMapper.TopProductItem&gt; topProducts = adminStatisticsMapper.selectTopProducts();</span>
+
+<span class="fc" id="L154">        List&lt;String&gt; names = topProducts.stream()</span>
+<span class="fc" id="L155">                .map(AdminStatisticsMapper.TopProductItem::getGoodsName)</span>
+<span class="fc" id="L156">                .collect(Collectors.toList());</span>
+<span class="fc" id="L157">        List&lt;Long&gt; sales = topProducts.stream()</span>
+<span class="fc" id="L158">                .map(AdminStatisticsMapper.TopProductItem::getSales)</span>
+<span class="fc" id="L159">                .collect(Collectors.toList());</span>
+
+<span class="fc" id="L161">        response.setXAxis(names);</span>
+
+<span class="fc" id="L163">        TopProductsResponse.SeriesItem series = new TopProductsResponse.SeriesItem();</span>
+<span class="fc" id="L164">        series.setName(&quot;销量&quot;);</span>
+<span class="fc" id="L165">        series.setType(&quot;bar&quot;);</span>
+<span class="fc" id="L166">        series.setData(sales);</span>
+
+<span class="fc" id="L168">        response.setSeries(List.of(series));</span>
+
+<span class="fc" id="L170">        return response;</span>
+    }
+
+    /**
+     * 补齐缺失的日期数据。
+     */
+    private List&lt;DashboardStatsResponse.SalesTrendItem&gt; fillMissingDates(
+            List&lt;DashboardStatsResponse.SalesTrendItem&gt; items, int days) {
+        
+<span class="fc" id="L179">        List&lt;DashboardStatsResponse.SalesTrendItem&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L180">        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd&quot;);</span>
+<span class="fc" id="L181">        LocalDate today = LocalDate.now();</span>
+
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        for (int i = days - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L184">            LocalDate date = today.minusDays(i);</span>
+<span class="fc" id="L185">            String dateStr = date.toString();</span>
+
+<span class="fc" id="L187">            DashboardStatsResponse.SalesTrendItem item = items.stream()</span>
+<span class="pc" id="L188">                    .filter(it -&gt; it.getDate().equals(dateStr))</span>
+<span class="fc" id="L189">                    .findFirst()</span>
+<span class="fc" id="L190">                    .orElse(null);</span>
+
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (item == null) {</span>
+<span class="fc" id="L193">                item = new DashboardStatsResponse.SalesTrendItem();</span>
+<span class="fc" id="L194">                item.setDate(dateStr);</span>
+<span class="fc" id="L195">                item.setAmount(BigDecimal.ZERO);</span>
+<span class="fc" id="L196">                item.setOrderCount(0L);</span>
+            }
+
+<span class="fc" id="L199">            result.add(item);</span>
+        }
+
+<span class="fc" id="L202">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

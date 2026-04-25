@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CategoryServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-goods</a> &gt; <a href="index.source.html" class="el_package">com.seckill.goods.service.impl</a> &gt; <span class="el_source">CategoryServiceImpl.java</span></div><h1>CategoryServiceImpl.java</h1><pre class="source lang-java linenums">package com.seckill.goods.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.seckill.common.enums.ResponseCodeEnum;
+import com.seckill.common.exception.BusinessException;
+import com.seckill.goods.dto.CategoryRequest;
+import com.seckill.goods.dto.CategoryTreeResponse;
+import com.seckill.goods.entity.Category;
+import com.seckill.goods.entity.Goods;
+import com.seckill.goods.mapper.CategoryMapper;
+import com.seckill.goods.mapper.GoodsMapper;
+import com.seckill.goods.service.CategoryService;
+import com.seckill.infrastructure.utils.RedisUtils;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * 分类领域核心实现。
+ * &lt;p&gt;
+ * 主要负责三件事：
+ * &lt;ul&gt;
+ *     &lt;li&gt;把数据库中的平铺分类组装为前台可直接使用的树结构&lt;/li&gt;
+ *     &lt;li&gt;处理管理端的新增、修改、删除操作&lt;/li&gt;
+ *     &lt;li&gt;在分类发生变更时清理分类树和商品相关缓存&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+@Service
+<span class="fc" id="L39">@RequiredArgsConstructor</span>
+public class CategoryServiceImpl implements CategoryService {
+
+    private static final String CATEGORY_TREE_KEY = &quot;category:tree&quot;;
+    private static final String GOODS_LIST_KEY_PATTERN = &quot;goods:list:*&quot;;
+    private static final String GOODS_DETAIL_KEY_PREFIX = &quot;goods:detail:&quot;;
+    private static final long CATEGORY_TREE_BASE_TTL_SECONDS = 3600L;
+    private static final long CATEGORY_TREE_RANDOM_TTL_SECONDS = 300L;
+
+    private final CategoryMapper categoryMapper;
+    private final GoodsMapper goodsMapper;
+    private final RedisUtils redisUtils;
+
+    @Override
+    public List&lt;CategoryTreeResponse&gt; getCategoryTree() {
+        // 分类树属于高频低变更数据，优先从 Redis 读取。
+<span class="fc" id="L55">        List&lt;CategoryTreeResponse&gt; cached = redisUtils.get(CATEGORY_TREE_KEY);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (cached != null) {</span>
+<span class="fc" id="L57">            return cached;</span>
+        }
+
+<span class="fc" id="L60">        List&lt;Category&gt; categories = categoryMapper.selectList(new LambdaQueryWrapper&lt;Category&gt;()</span>
+<span class="fc" id="L61">                .eq(Category::getStatus, 1)</span>
+<span class="fc" id="L62">                .orderByAsc(Category::getParentId, Category::getSort, Category::getId));</span>
+
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (categories.isEmpty()) {</span>
+<span class="fc" id="L65">            return Collections.emptyList();</span>
+        }
+
+<span class="fc" id="L68">        List&lt;CategoryTreeResponse&gt; tree = buildCategoryTree(categories);</span>
+<span class="fc" id="L69">        redisUtils.set(CATEGORY_TREE_KEY, tree, randomCategoryTreeTtl(), TimeUnit.SECONDS);</span>
+<span class="fc" id="L70">        return tree;</span>
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createCategory(CategoryRequest request) {
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        Long parentId = request.getParentId() == null ? 0L : request.getParentId();</span>
+        // 新增前先校验父分类是否合法，保证项目只维护两级分类结构。
+<span class="fc" id="L78">        validateParentCategory(parentId);</span>
+
+<span class="fc" id="L80">        Category category = new Category();</span>
+<span class="fc" id="L81">        category.setParentId(parentId);</span>
+<span class="fc" id="L82">        category.setName(request.getName());</span>
+<span class="fc" id="L83">        category.setIcon(request.getIcon());</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        category.setSort(request.getSort() == null ? 0 : request.getSort());</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        category.setStatus(request.getStatus() == null ? 1 : request.getStatus());</span>
+<span class="fc" id="L86">        categoryMapper.insert(category);</span>
+
+<span class="fc" id="L88">        clearCategoryCaches();</span>
+<span class="fc" id="L89">        return category.getId();</span>
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateCategory(Long categoryId, CategoryRequest request) {
+<span class="fc" id="L95">        Category existing = requireCategory(categoryId);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        Long targetParentId = request.getParentId() == null ? existing.getParentId() : request.getParentId();</span>
+
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (!categoryId.equals(targetParentId)) {</span>
+<span class="fc" id="L99">            validateParentCategory(targetParentId);</span>
+        } else {
+<span class="fc" id="L101">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;分类不能将自己设为父分类&quot;);</span>
+        }
+
+<span class="fc" id="L104">        existing.setParentId(targetParentId);</span>
+<span class="fc" id="L105">        existing.setName(request.getName());</span>
+<span class="fc" id="L106">        existing.setIcon(request.getIcon());</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        existing.setSort(request.getSort() == null ? existing.getSort() : request.getSort());</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        existing.setStatus(request.getStatus() == null ? existing.getStatus() : request.getStatus());</span>
+<span class="fc" id="L109">        categoryMapper.updateById(existing);</span>
+
+        // 分类变更会影响分类树和商品详情中的分类信息，因此需要联动清理缓存。
+<span class="fc" id="L112">        clearCategoryCaches();</span>
+<span class="fc" id="L113">        clearGoodsDetailCachesByCategory(categoryId);</span>
+<span class="fc" id="L114">    }</span>
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteCategory(Long categoryId) {
+<span class="fc" id="L119">        Category category = requireCategory(categoryId);</span>
+
+<span class="fc" id="L121">        Long childCount = categoryMapper.selectCount(new LambdaQueryWrapper&lt;Category&gt;()</span>
+<span class="fc" id="L122">                .eq(Category::getParentId, categoryId));</span>
+<span class="pc bpc" id="L123" title="1 of 4 branches missed.">        if (childCount != null &amp;&amp; childCount &gt; 0) {</span>
+<span class="fc" id="L124">            throw new BusinessException(ResponseCodeEnum.BAD_REQUEST, &quot;该分类下存在子分类，无法删除&quot;);</span>
+        }
+
+<span class="fc" id="L127">        Long goodsCount = goodsMapper.selectCount(new LambdaQueryWrapper&lt;Goods&gt;()</span>
+<span class="fc" id="L128">                .eq(Goods::getCategoryId, categoryId));</span>
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">        if (goodsCount != null &amp;&amp; goodsCount &gt; 0) {</span>
+<span class="fc" id="L130">            throw new BusinessException(ResponseCodeEnum.BAD_REQUEST, &quot;该分类下存在商品，无法删除&quot;);</span>
+        }
+
+<span class="fc" id="L133">        categoryMapper.deleteById(category.getId());</span>
+<span class="fc" id="L134">        clearCategoryCaches();</span>
+<span class="fc" id="L135">    }</span>
+
+    private List&lt;CategoryTreeResponse&gt; buildCategoryTree(List&lt;Category&gt; categories) {
+<span class="fc" id="L138">        Map&lt;Long, CategoryTreeResponse&gt; responseMap = categories.stream()</span>
+<span class="fc" id="L139">                .map(this::toTreeResponse)</span>
+<span class="fc" id="L140">                .collect(Collectors.toMap(CategoryTreeResponse::getCategoryId, Function.identity()));</span>
+
+        // 先把所有节点放入 map，再按 parentId 串起父子关系，可避免递归重复扫描列表。
+<span class="fc" id="L143">        List&lt;CategoryTreeResponse&gt; roots = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        for (Category category : categories) {</span>
+<span class="fc" id="L145">            CategoryTreeResponse current = responseMap.get(category.getId());</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">            if (category.getParentId() == null || category.getParentId() == 0L) {</span>
+<span class="fc" id="L147">                roots.add(current);</span>
+<span class="fc" id="L148">                continue;</span>
+            }
+<span class="fc" id="L150">            CategoryTreeResponse parent = responseMap.get(category.getParentId());</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L152">                parent.getChildren().add(current);</span>
+            }
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">        return roots;</span>
+    }
+
+    private CategoryTreeResponse toTreeResponse(Category category) {
+<span class="fc" id="L159">        CategoryTreeResponse response = new CategoryTreeResponse();</span>
+<span class="fc" id="L160">        response.setCategoryId(category.getId());</span>
+<span class="fc" id="L161">        response.setCategoryName(category.getName());</span>
+<span class="fc" id="L162">        response.setIcon(category.getIcon());</span>
+<span class="fc" id="L163">        response.setSort(category.getSort());</span>
+<span class="fc" id="L164">        response.setParentId(category.getParentId());</span>
+<span class="fc" id="L165">        return response;</span>
+    }
+
+    private void validateParentCategory(Long parentId) {
+<span class="pc bpc" id="L169" title="1 of 4 branches missed.">        if (parentId == null || parentId == 0L) {</span>
+<span class="fc" id="L170">            return;</span>
+        }
+
+<span class="fc" id="L173">        Category parent = requireCategory(parentId);</span>
+        // 当前项目约束只支持两级分类，因此父分类必须是一级分类。
+<span class="pc bpc" id="L175" title="1 of 4 branches missed.">        if (parent.getParentId() != null &amp;&amp; parent.getParentId() != 0L) {</span>
+<span class="fc" id="L176">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;仅支持两级分类&quot;);</span>
+        }
+<span class="pc bpc" id="L178" title="1 of 4 branches missed.">        if (parent.getStatus() != null &amp;&amp; parent.getStatus() == 0) {</span>
+<span class="fc" id="L179">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;父分类已禁用&quot;);</span>
+        }
+<span class="fc" id="L181">    }</span>
+
+    private Category requireCategory(Long categoryId) {
+<span class="fc" id="L184">        Category category = categoryMapper.selectById(categoryId);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (category == null) {</span>
+<span class="fc" id="L186">            throw new BusinessException(ResponseCodeEnum.CATEGORY_NOT_FOUND);</span>
+        }
+<span class="fc" id="L188">        return category;</span>
+    }
+
+    private void clearCategoryCaches() {
+<span class="fc" id="L192">        redisUtils.delete(CATEGORY_TREE_KEY);</span>
+<span class="fc" id="L193">        redisUtils.deleteByPattern(GOODS_LIST_KEY_PATTERN);</span>
+<span class="fc" id="L194">    }</span>
+
+    private void clearGoodsDetailCachesByCategory(Long categoryId) {
+<span class="fc" id="L197">        List&lt;Goods&gt; goodsList = goodsMapper.selectList(new LambdaQueryWrapper&lt;Goods&gt;()</span>
+<span class="fc" id="L198">                .select(Goods::getId)</span>
+<span class="fc" id="L199">                .eq(Goods::getCategoryId, categoryId));</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if (goodsList.isEmpty()) {</span>
+<span class="fc" id="L201">            return;</span>
+        }
+        // 这里不直接删商品列表模式缓存，是因为分类级缓存已在 clearCategoryCaches() 中统一处理。
+<span class="nc" id="L204">        List&lt;String&gt; keysToDelete = goodsList.stream()</span>
+<span class="nc" id="L205">                .map(Goods::getId)</span>
+<span class="nc" id="L206">                .filter(java.util.Objects::nonNull)</span>
+<span class="nc" id="L207">                .map(id -&gt; GOODS_DETAIL_KEY_PREFIX + id)</span>
+<span class="nc" id="L208">                .toList();</span>
+<span class="nc" id="L209">        redisUtils.pipelineDelete(keysToDelete);</span>
+<span class="nc" id="L210">    }</span>
+
+    private long randomCategoryTreeTtl() {
+<span class="fc" id="L213">        return CATEGORY_TREE_BASE_TTL_SECONDS</span>
+<span class="fc" id="L214">                + ThreadLocalRandom.current().nextLong(CATEGORY_TREE_RANDOM_TTL_SECONDS + 1);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

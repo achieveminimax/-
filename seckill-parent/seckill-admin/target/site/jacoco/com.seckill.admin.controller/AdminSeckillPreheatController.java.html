@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminSeckillPreheatController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-admin</a> &gt; <a href="index.source.html" class="el_package">com.seckill.admin.controller</a> &gt; <span class="el_source">AdminSeckillPreheatController.java</span></div><h1>AdminSeckillPreheatController.java</h1><pre class="source lang-java linenums">package com.seckill.admin.controller;
+
+import com.seckill.admin.annotation.RequireAdmin;
+import com.seckill.admin.enums.AdminRoleEnum;
+import com.seckill.common.result.Result;
+import com.seckill.goods.service.SeckillPreheatService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
+
+/**
+ * 管理端秒杀预热入口。
+ * &lt;p&gt;
+ * 主要用于运营或开发测试时手动触发预热，验证活动详情和库存是否已提前写入 Redis。
+ */
+@RestController
+@RequestMapping(&quot;/api/admin/seckill/preheat&quot;)
+<span class="nc" id="L22">@RequiredArgsConstructor</span>
+public class AdminSeckillPreheatController {
+
+    /**
+     * 秒杀预热服务。
+     */
+    private final SeckillPreheatService seckillPreheatService;
+
+    /**
+     * 手动预热单个活动。
+     */
+    @PostMapping(&quot;/{activityId}&quot;)
+    @RequireAdmin(roles = {AdminRoleEnum.SUPER_ADMIN, AdminRoleEnum.ADMIN, AdminRoleEnum.OPERATOR})
+    public Result&lt;Void&gt; preheatActivity(@PathVariable Long activityId) {
+<span class="nc" id="L36">        seckillPreheatService.preheatActivity(activityId);</span>
+<span class="nc" id="L37">        return Result.success();</span>
+    }
+
+    /**
+     * 批量预热未来 5 分钟内的活动。
+     */
+    @PostMapping(&quot;/upcoming&quot;)
+    @RequireAdmin(roles = {AdminRoleEnum.SUPER_ADMIN, AdminRoleEnum.ADMIN, AdminRoleEnum.OPERATOR})
+    public Result&lt;Map&lt;String, Integer&gt;&gt; preheatUpcomingActivities() {
+<span class="nc" id="L46">        int count = seckillPreheatService.preheatUpcomingActivities();</span>
+<span class="nc" id="L47">        return Result.success(Map.of(&quot;preheatedCount&quot;, count));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

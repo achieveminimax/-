@@ -16,6 +16,14 @@ import java.util.Map;
 @Slf4j
 public class JwtUtils {
 
+    private static final String TOKEN_TYPE_CLAIM = "type";
+    private static final String SUBJECT_TYPE_CLAIM = "subjectType";
+    private static final String ROLE_CLAIM = "role";
+    private static final String ACCESS_TOKEN_TYPE = "access";
+    private static final String REFRESH_TOKEN_TYPE = "refresh";
+    private static final String USER_SUBJECT_TYPE = "user";
+    private static final String ADMIN_SUBJECT_TYPE = "admin";
+
     /**
      * 默认密钥（生产环境应从配置文件读取）
      */
@@ -56,7 +64,7 @@ public class JwtUtils {
      * @return Token字符串
      */
     public static String generateAccessToken(Long userId, String secret) {
-        return generateToken(userId, ACCESS_TOKEN_EXPIRE, secret);
+        return generateToken(userId, ACCESS_TOKEN_EXPIRE, secret, USER_SUBJECT_TYPE, null);
     }
 
     /**
@@ -77,7 +85,35 @@ public class JwtUtils {
      * @return Token字符串
      */
     public static String generateRefreshToken(Long userId, String secret) {
-        return generateToken(userId, REFRESH_TOKEN_EXPIRE, secret);
+        return generateToken(userId, REFRESH_TOKEN_EXPIRE, secret, USER_SUBJECT_TYPE, null);
+    }
+
+    /**
+     * 生成管理员访问 Token
+     */
+    public static String generateAdminAccessToken(Long adminId, String role) {
+        return generateAdminAccessToken(adminId, role, DEFAULT_SECRET);
+    }
+
+    /**
+     * 生成管理员访问 Token
+     */
+    public static String generateAdminAccessToken(Long adminId, String role, String secret) {
+        return generateToken(adminId, ACCESS_TOKEN_EXPIRE, secret, ADMIN_SUBJECT_TYPE, role);
+    }
+
+    /**
+     * 生成管理员刷新 Token
+     */
+    public static String generateAdminRefreshToken(Long adminId) {
+        return generateAdminRefreshToken(adminId, DEFAULT_SECRET);
+    }
+
+    /**
+     * 生成管理员刷新 Token
+     */
+    public static String generateAdminRefreshToken(Long adminId, String secret) {
+        return generateToken(adminId, REFRESH_TOKEN_EXPIRE, secret, ADMIN_SUBJECT_TYPE, null);
     }
 
     /**
@@ -88,13 +124,17 @@ public class JwtUtils {
      * @param secret     密钥
      * @return Token字符串
      */
-    public static String generateToken(Long userId, long expireTime, String secret) {
+    public static String generateToken(Long userId, long expireTime, String secret, String subjectType, String role) {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + expireTime);
 
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
-        claims.put("type", expireTime == ACCESS_TOKEN_EXPIRE ? "access" : "refresh");
+        claims.put(TOKEN_TYPE_CLAIM, expireTime == ACCESS_TOKEN_EXPIRE ? ACCESS_TOKEN_TYPE : REFRESH_TOKEN_TYPE);
+        claims.put(SUBJECT_TYPE_CLAIM, subjectType);
+        if (role != null) {
+            claims.put(ROLE_CLAIM, role);
+        }
 
         return Jwts.builder()
                 .claims(claims)
@@ -150,6 +190,66 @@ public class JwtUtils {
     public static Long getUserIdFromToken(String token, String secret) {
         Claims claims = parseToken(token, secret);
         return Long.valueOf(claims.getSubject());
+    }
+
+    /**
+     * 获取主体类型
+     */
+    public static String getSubjectType(String token) {
+        return getSubjectType(token, DEFAULT_SECRET);
+    }
+
+    /**
+     * 获取主体类型
+     */
+    public static String getSubjectType(String token, String secret) {
+        Claims claims = parseToken(token, secret);
+        return claims.get(SUBJECT_TYPE_CLAIM, String.class);
+    }
+
+    /**
+     * 获取角色
+     */
+    public static String getRole(String token) {
+        return getRole(token, DEFAULT_SECRET);
+    }
+
+    /**
+     * 获取角色
+     */
+    public static String getRole(String token, String secret) {
+        Claims claims = parseToken(token, secret);
+        return claims.get(ROLE_CLAIM, String.class);
+    }
+
+    /**
+     * 是否访问 Token
+     */
+    public static boolean isAccessToken(String token) {
+        return isAccessToken(token, DEFAULT_SECRET);
+    }
+
+    /**
+     * 是否访问 Token
+     */
+    public static boolean isAccessToken(String token, String secret) {
+        Claims claims = parseToken(token, secret);
+        return ACCESS_TOKEN_TYPE.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
+    }
+
+    /**
+     * 是否刷新 Token
+     */
+    public static boolean isRefreshToken(String token) {
+        return isRefreshToken(token, DEFAULT_SECRET);
+    }
+
+    /**
+     * 是否刷新 Token
+     */
+    public static boolean isRefreshToken(String token, String secret) {
+        Claims claims = parseToken(token, secret);
+        return REFRESH_TOKEN_TYPE.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
     }
 
     /**

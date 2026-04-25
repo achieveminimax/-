@@ -2,9 +2,11 @@ package com.seckill.infrastructure.utils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -41,10 +43,45 @@ public class RedisUtils {
     }
 
     /**
+     * 按模式批量删除 key（使用 SCAN 替代 KEYS，避免阻塞 Redis）
+     */
+    public Long deleteByPattern(String pattern) {
+        Set<String> keys = scanKeys(pattern);
+        if (keys == null || keys.isEmpty()) {
+            return 0L;
+        }
+        return delete(keys);
+    }
+
+    /**
      * 判断 key 是否存在
      */
     public Boolean hasKey(String key) {
         return redisTemplate.hasKey(key);
+    }
+
+    /**
+     * 使用 SCAN 命令迭代扫描匹配的 key（替代 KEYS 命令，避免阻塞 Redis）
+     */
+    public Set<String> scanKeys(String pattern) {
+        Set<String> result = new java.util.HashSet<>();
+        try {
+            var cursor = redisTemplate.scan(org.springframework.data.redis.core.ScanOptions.scanOptions()
+                    .match(pattern)
+                    .count(200)
+                    .build());
+            if (cursor != null) {
+                cursor.forEachRemaining(key -> result.add((String) key));
+                cursor.close();
+            }
+        } catch (Exception e) {
+            log.warn("SCAN 命令执行失败, pattern={}, 降级为 KEYS 命令", pattern, e);
+            Set<String> fallback = redisTemplate.keys(pattern);
+            if (fallback != null) {
+                result.addAll(fallback);
+            }
+        }
+        return result;
     }
 
     /**
@@ -261,6 +298,63 @@ public class RedisUtils {
         return redisTemplate.opsForZSet().remove(key, members);
     }
 
+    // ==================== Pipeline 批量操作 ====================
+
+    /**
+     * Pipeline 批量设置 String 值（带过期时间），减少网络往返
+     */
+    public void pipelineSet(Map<String, Object> keyValueMap, long timeout, TimeUnit unit) {
+        if (keyValueMap == null || keyValueMap.isEmpty()) {
+            return;
+        }
+        redisTemplate.executePipelined((RedisCallback<Void>) connection -> {
+            long timeoutSeconds = unit.toSeconds(timeout);
+            org.springframework.data.redis.serializer.RedisSerializer<String> stringSerializer = redisTemplate.getStringSerializer();
+            org.springframework.data.redis.serializer.RedisSerializer<Object> valueSerializer = (org.springframework.data.redis.serializer.RedisSerializer<Object>) redisTemplate.getValueSerializer();
+            for (Map.Entry<String, Object> entry : keyValueMap.entrySet()) {
+                byte[] keyBytes = stringSerializer.serialize(entry.getKey());
+                byte[] valueBytes = valueSerializer.serialize(entry.getValue());
+                connection.stringCommands().set(keyBytes, valueBytes,
+                        org.springframework.data.redis.core.types.Expiration.seconds(timeoutSeconds),
+                        org.springframework.data.redis.connection.RedisStringCommands.SetOption.UPSERT);
+            }
+            return null;
+        });
+    }
+
+    /**
+     * Pipeline 批量删除 key，减少网络往返
+     */
+    public Long pipelineDelete(Collection<String> keys) {
+        if (keys == null || keys.isEmpty()) {
+            return 0L;
+        }
+        org.springframework.data.redis.serializer.RedisSerializer<String> stringSerializer = redisTemplate.getStringSerializer();
+        List<Object> results = redisTemplate.executePipelined((RedisCallback<Void>) connection -> {
+            for (String key : keys) {
+                connection.keyCommands().del(stringSerializer.serialize(key));
+            }
+            return null;
+        });
+        return (long) results.size();
+    }
+
+    /**
+     * Pipeline 批量获取 String 值，减少网络往返
+     */
+    public List<Object> pipelineGet(Collection<String> keys) {
+        if (keys == null || keys.isEmpty()) {
+            return new ArrayList<>();
+        }
+        org.springframework.data.redis.serializer.RedisSerializer<String> stringSerializer = redisTemplate.getStringSerializer();
+        return redisTemplate.executePipelined((RedisCallback<Void>) connection -> {
+            for (String key : keys) {
+                connection.stringCommands().get(stringSerializer.serialize(key));
+            }
+            return null;
+        });
+    }
+
     // ==================== 分布式锁 ====================
 
     /**
@@ -277,19 +371,22 @@ public class RedisUtils {
         return Boolean.TRUE.equals(success);
     }
 
+    private static final org.springframework.data.redis.core.script.RedisScript<Long> RELEASE_LOCK_SCRIPT =
+            org.springframework.data.redis.core.script.RedisScript.of(
+                    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+                    Long.class);
+
     /**
-     * 释放分布式锁
+     * 释放分布式锁（使用 Lua 脚本保证原子性，避免竞态条件）
      *
      * @param lockKey   锁的 key
      * @param requestId 请求标识
      * @return 是否释放成功
      */
     public boolean releaseLock(String lockKey, String requestId) {
-        String value = get(lockKey);
-        if (requestId.equals(value)) {
-            return Boolean.TRUE.equals(delete(lockKey));
-        }
-        return false;
+        Long result = redisTemplate.execute(RELEASE_LOCK_SCRIPT,
+                java.util.Collections.singletonList(lockKey), requestId);
+        return result != null && result > 0;
     }
 
 }

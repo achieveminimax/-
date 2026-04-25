@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminSeckillStatisticsResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-admin</a> &gt; <a href="index.source.html" class="el_package">com.seckill.admin.dto.seckill</a> &gt; <span class="el_source">AdminSeckillStatisticsResponse.java</span></div><h1>AdminSeckillStatisticsResponse.java</h1><pre class="source lang-java linenums">package com.seckill.admin.dto.seckill;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * 管理端秒杀活动统计响应。
+ */
+<span class="pc bnc" id="L12" title="All 118 branches missed.">@Data</span>
+public class AdminSeckillStatisticsResponse {
+
+<span class="fc" id="L15">    private Long activityId;</span>
+<span class="nc" id="L16">    private String activityName;</span>
+<span class="nc" id="L17">    private LocalDateTime startTime;</span>
+<span class="nc" id="L18">    private LocalDateTime endTime;</span>
+<span class="fc" id="L19">    private Integer totalStock;</span>
+<span class="fc" id="L20">    private Integer totalSales;</span>
+<span class="fc" id="L21">    private Double salesRate;</span>
+<span class="nc" id="L22">    private BigDecimal totalAmount;</span>
+<span class="nc" id="L23">    private Long totalUsers;</span>
+<span class="nc" id="L24">    private Long totalRequests;</span>
+<span class="nc" id="L25">    private Double successRate;</span>
+<span class="nc" id="L26">    private Long averageResponseTime;</span>
+<span class="fc" id="L27">    private List&lt;GoodsStatistics&gt; goodsStatistics;</span>
+<span class="fc" id="L28">    private List&lt;TimeDistribution&gt; timeDistribution;</span>
+
+    /**
+     * 商品统计。
+     */
+<span class="pc bnc" id="L33" title="All 62 branches missed.">    @Data</span>
+    public static class GoodsStatistics {
+<span class="nc" id="L35">        private Long goodsId;</span>
+<span class="nc" id="L36">        private String goodsName;</span>
+<span class="nc" id="L37">        private BigDecimal seckillPrice;</span>
+<span class="nc" id="L38">        private Integer totalStock;</span>
+<span class="nc" id="L39">        private Integer totalSales;</span>
+<span class="nc" id="L40">        private Double salesRate;</span>
+<span class="nc" id="L41">        private BigDecimal totalAmount;</span>
+    }
+
+    /**
+     * 时间分布。
+     */
+<span class="pc bnc" id="L47" title="All 22 branches missed.">    @Data</span>
+    public static class TimeDistribution {
+<span class="nc" id="L49">        private String time;</span>
+<span class="nc" id="L50">        private Integer sales;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

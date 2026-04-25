@@ -182,6 +182,15 @@ public class AddressServiceImpl implements AddressService {
                 .orElse(null);
     }
 
+    @Override
+    public Address getAddressById(Long userId, Long addressId) {
+        Address address = addressMapper.selectOwnedAddress(userId, addressId);
+        if (address == null) {
+            throw new BusinessException(ResponseCodeEnum.ADDRESS_NOT_FOUND);
+        }
+        return address;
+    }
+
     /**
      * 转换为响应对象
      */

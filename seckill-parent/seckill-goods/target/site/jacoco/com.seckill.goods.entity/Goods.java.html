@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Goods.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-goods</a> &gt; <a href="index.source.html" class="el_package">com.seckill.goods.entity</a> &gt; <span class="el_source">Goods.java</span></div><h1>Goods.java</h1><pre class="source lang-java linenums">package com.seckill.goods.entity;
+
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.seckill.common.entity.BaseEntity;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+import java.math.BigDecimal;
+
+/**
+ * 商品实体。
+ * &lt;p&gt;
+ * 继承 {@link BaseEntity} 后，会自动带上主键、创建时间、更新时间和逻辑删除字段。
+ */
+<span class="pc" id="L16">@Data</span>
+<span class="nc bnc" id="L17" title="All 88 branches missed.">@EqualsAndHashCode(callSuper = true)</span>
+@TableName(&quot;t_goods&quot;)
+public class Goods extends BaseEntity {
+    /** 商品名称。 */
+<span class="fc" id="L21">    private String name;</span>
+    /** 商品简介。 */
+<span class="fc" id="L23">    private String description;</span>
+    /** 商品原价。 */
+<span class="fc" id="L25">    private BigDecimal price;</span>
+    /** 普通库存。 */
+<span class="fc" id="L27">    private Integer stock;</span>
+
+    /** 所属分类 ID，要求挂在二级分类下。 */
+    @TableField(&quot;category_id&quot;)
+<span class="fc" id="L31">    private Long categoryId;</span>
+
+    /** 商品封面图。 */
+    @TableField(&quot;cover_image&quot;)
+<span class="fc" id="L35">    private String coverImage;</span>
+
+    /** 商品轮播图，使用 JSON 数组字符串存储。 */
+<span class="fc" id="L38">    private String images;</span>
+    /** 商品详情富文本。 */
+<span class="fc" id="L40">    private String detail;</span>
+    /** 销量。 */
+<span class="fc" id="L42">    private Integer sales;</span>
+    /** 商品状态：0-下架，1-上架。 */
+<span class="fc" id="L44">    private Integer status;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

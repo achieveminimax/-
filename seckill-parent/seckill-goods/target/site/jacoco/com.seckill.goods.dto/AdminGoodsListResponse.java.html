@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminGoodsListResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-goods</a> &gt; <a href="index.source.html" class="el_package">com.seckill.goods.dto</a> &gt; <span class="el_source">AdminGoodsListResponse.java</span></div><h1>AdminGoodsListResponse.java</h1><pre class="source lang-java linenums">package com.seckill.goods.dto;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+/**
+ * 管理端商品列表响应体。
+ */
+<span class="pc bnc" id="L11" title="All 102 branches missed.">@Data</span>
+public class AdminGoodsListResponse {
+    /** 商品 ID。 */
+<span class="nc" id="L14">    private Long goodsId;</span>
+    /** 商品名称。 */
+<span class="fc" id="L16">    private String goodsName;</span>
+    /** 商品主图。 */
+<span class="nc" id="L18">    private String goodsImg;</span>
+    /** 分类 ID。 */
+<span class="nc" id="L20">    private Long categoryId;</span>
+    /** 分类名称。 */
+<span class="nc" id="L22">    private String categoryName;</span>
+    /** 商品价格。 */
+<span class="nc" id="L24">    private BigDecimal price;</span>
+    /** 库存。 */
+<span class="nc" id="L26">    private Integer stock;</span>
+    /** 销量。 */
+<span class="nc" id="L28">    private Integer sales;</span>
+    /** 状态码。 */
+<span class="nc" id="L30">    private Integer status;</span>
+    /** 状态文案。 */
+<span class="nc" id="L32">    private String statusDesc;</span>
+    /** 创建时间。 */
+<span class="nc" id="L34">    private LocalDateTime createTime;</span>
+    /** 更新时间。 */
+<span class="nc" id="L36">    private LocalDateTime updateTime;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

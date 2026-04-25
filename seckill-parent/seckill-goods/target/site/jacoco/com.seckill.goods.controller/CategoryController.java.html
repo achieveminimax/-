@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CategoryController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-goods</a> &gt; <a href="index.source.html" class="el_package">com.seckill.goods.controller</a> &gt; <span class="el_source">CategoryController.java</span></div><h1>CategoryController.java</h1><pre class="source lang-java linenums">package com.seckill.goods.controller;
+
+import com.seckill.common.result.Result;
+import com.seckill.goods.dto.CategoryTreeResponse;
+import com.seckill.goods.service.CategoryService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * 前台商品分类查询入口。
+ * &lt;p&gt;
+ * 该控制器只提供分类树的只读查询，分类新增、修改、删除统一由管理端控制器负责。
+ */
+@RestController
+@RequestMapping(&quot;/api/category&quot;)
+<span class="nc" id="L20">@RequiredArgsConstructor</span>
+public class CategoryController {
+
+    /**
+     * 分类领域服务。
+     */
+    private final CategoryService categoryService;
+
+    /**
+     * 查询分类树。
+     * &lt;p&gt;
+     * 返回两级树结构，前端可直接渲染分类导航或分类筛选面板。
+     */
+    @GetMapping(&quot;/list&quot;)
+    public Result&lt;List&lt;CategoryTreeResponse&gt;&gt; list() {
+<span class="nc" id="L35">        return Result.success(categoryService.getCategoryTree());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

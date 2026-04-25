@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OrderTimeoutConsumer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-order</a> &gt; <a href="index.source.html" class="el_package">com.seckill.order.mq</a> &gt; <span class="el_source">OrderTimeoutConsumer.java</span></div><h1>OrderTimeoutConsumer.java</h1><pre class="source lang-java linenums">package com.seckill.order.mq;
+
+import com.rabbitmq.client.Channel;
+import com.seckill.common.enums.OrderStatusEnum;
+import com.seckill.infrastructure.config.RabbitMQConfig;
+import com.seckill.infrastructure.utils.RedisOperations;
+import com.seckill.order.entity.Order;
+import com.seckill.order.mapper.OrderMapper;
+import com.seckill.order.service.StockRollbackService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * 订单超时消费者
+ * 消费死信队列中的超时消息，执行订单取消和库存回滚
+ */
+<span class="fc" id="L23">@Slf4j</span>
+@Component
+<span class="fc" id="L25">@RequiredArgsConstructor</span>
+public class OrderTimeoutConsumer {
+
+    private final OrderMapper orderMapper;
+    private final StockRollbackService stockRollbackService;
+    private final RedisOperations redisOperations;
+
+    private static final String LOCK_KEY_PREFIX = &quot;order:timeout:lock:&quot;;
+    private static final long LOCK_EXPIRE_SECONDS = 30;
+
+    /**
+     * 消费订单超时消息
+     */
+    @RabbitListener(queues = RabbitMQConfig.ORDER_TIMEOUT_QUEUE)
+    public void consume(OrderTimeoutMessage message, Message mqMessage, Channel channel) throws IOException {
+<span class="fc" id="L40">        long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();</span>
+<span class="fc" id="L41">        String orderNo = message.getOrderNo();</span>
+
+<span class="fc" id="L43">        log.info(&quot;收到订单超时消息, orderNo={}, userId={}, activityId={}, goodsId={}&quot;,</span>
+<span class="fc" id="L44">                orderNo, message.getUserId(), message.getActivityId(), message.getGoodsId());</span>
+
+<span class="fc" id="L46">        String lockKey = LOCK_KEY_PREFIX + orderNo;</span>
+<span class="fc" id="L47">        Boolean locked = redisOperations.setIfAbsent(lockKey, &quot;1&quot;, LOCK_EXPIRE_SECONDS, TimeUnit.SECONDS);</span>
+        
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (!Boolean.TRUE.equals(locked)) {</span>
+<span class="fc" id="L50">            log.info(&quot;订单超时处理中或已处理，跳过, orderNo={}&quot;, orderNo);</span>
+<span class="fc" id="L51">            channel.basicAck(deliveryTag, false);</span>
+<span class="fc" id="L52">            return;</span>
+        }
+
+        try {
+<span class="fc" id="L56">            processTimeout(message, orderNo, deliveryTag, channel);</span>
+        } finally {
+<span class="fc" id="L58">            redisOperations.delete(lockKey);</span>
+        }
+<span class="fc" id="L60">    }</span>
+
+    private void processTimeout(OrderTimeoutMessage message, String orderNo, long deliveryTag, Channel channel) throws IOException {
+<span class="fc" id="L63">        Order order = orderMapper.selectByOrderNo(orderNo);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (order == null) {</span>
+<span class="fc" id="L65">            log.warn(&quot;订单不存在, orderNo={}&quot;, orderNo);</span>
+<span class="fc" id="L66">            channel.basicAck(deliveryTag, false);</span>
+<span class="fc" id="L67">            return;</span>
+        }
+
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (!OrderStatusEnum.PENDING_PAY.getCode().equals(order.getStatus())) {</span>
+<span class="fc" id="L71">            log.info(&quot;订单状态不是待支付，无需取消, orderNo={}, status={}&quot;, orderNo, order.getStatus());</span>
+<span class="fc" id="L72">            channel.basicAck(deliveryTag, false);</span>
+<span class="fc" id="L73">            return;</span>
+        }
+
+        try {
+<span class="fc" id="L77">            stockRollbackService.rollbackStock(</span>
+<span class="fc" id="L78">                    message.getActivityId(),</span>
+<span class="fc" id="L79">                    message.getGoodsId(),</span>
+<span class="fc" id="L80">                    message.getUserId(),</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                    message.getQuantity() == null ? 1 : message.getQuantity()</span>
+            );
+<span class="fc" id="L83">            log.info(&quot;订单超时库存回滚成功, orderNo={}&quot;, orderNo);</span>
+<span class="fc" id="L84">        } catch (Exception e) {</span>
+<span class="fc" id="L85">            log.error(&quot;订单超时库存回滚失败, orderNo={}&quot;, orderNo, e);</span>
+<span class="fc" id="L86">            channel.basicNack(deliveryTag, false, true);</span>
+<span class="fc" id="L87">            return;</span>
+<span class="fc" id="L88">        }</span>
+
+<span class="fc" id="L90">        int affected = orderMapper.cancelOrder(</span>
+                orderNo,
+<span class="fc" id="L92">                message.getUserId(),</span>
+<span class="fc" id="L93">                OrderStatusEnum.PENDING_PAY.getCode(),</span>
+<span class="fc" id="L94">                OrderStatusEnum.CANCELLED.getCode(),</span>
+                &quot;订单超时未支付，系统自动取消&quot;
+        );
+
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (affected &lt; 1) {</span>
+<span class="fc" id="L99">            log.warn(&quot;订单状态更新失败，可能已被处理, orderNo={}&quot;, orderNo);</span>
+<span class="fc" id="L100">            channel.basicAck(deliveryTag, false);</span>
+<span class="fc" id="L101">            return;</span>
+        }
+
+<span class="fc" id="L104">        log.info(&quot;订单超时取消成功, orderNo={}&quot;, orderNo);</span>
+<span class="fc" id="L105">        channel.basicAck(deliveryTag, false);</span>
+<span class="fc" id="L106">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

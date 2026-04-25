@@ -1,4 +1,7 @@
 com/seckill/user/service/UserServiceSpringTest.class
+com/seckill/user/service/UserServiceUnitTest.class
+com/seckill/user/service/AddressServiceUnitTest.class
 com/seckill/user/service/AddressServiceSpringTest.class
 com/seckill/user/util/TestDataFactory.class
 com/seckill/user/UserTestApplication.class
+com/seckill/user/service/UserAdminServiceImplUnitTest.class

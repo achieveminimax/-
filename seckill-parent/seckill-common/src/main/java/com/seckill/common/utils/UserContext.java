@@ -27,6 +27,15 @@ public class UserContext {
     }
 
     /**
+     * 获取当前用户ID（别名方法）
+     *
+     * @return 用户ID
+     */
+    public static Long getUserId() {
+        return USER_ID_HOLDER.get();
+    }
+
+    /**
      * 清除当前用户ID
      */
     public static void clear() {

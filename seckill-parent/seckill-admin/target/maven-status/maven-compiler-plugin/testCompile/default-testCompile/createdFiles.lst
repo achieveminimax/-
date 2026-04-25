@@ -1,0 +1,13 @@
+com/seckill/admin/service/AdminStatisticsServiceImplUnitTest$GetTopProductsTests.class
+com/seckill/admin/service/AdminSeckillServiceImplUnitTest$UpdateActivityTests.class
+com/seckill/admin/service/AdminSeckillServiceImplUnitTest.class
+com/seckill/admin/interceptor/AdminAuthorizationInterceptorUnitTest.class
+com/seckill/admin/service/AdminSeckillServiceImplUnitTest$GetActivityListTests.class
+com/seckill/admin/service/AdminStatisticsServiceImplUnitTest$GetSalesStatsTests.class
+com/seckill/admin/service/AdminStatisticsServiceImplUnitTest.class
+com/seckill/admin/service/AdminSeckillServiceImplUnitTest$GetActivityDetailTests.class
+com/seckill/admin/service/AdminSeckillServiceImplUnitTest$GetActivityStatisticsTests.class
+com/seckill/admin/service/AdminSeckillServiceImplUnitTest$CreateActivityTests.class
+com/seckill/admin/service/AdminAuthServiceUnitTest.class
+com/seckill/admin/service/AdminStatisticsServiceImplUnitTest$GetDashboardStatsTests.class
+com/seckill/admin/interceptor/AdminAuthorizationInterceptorUnitTest$TestController.class

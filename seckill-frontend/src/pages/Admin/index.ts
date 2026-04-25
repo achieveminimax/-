@@ -1,1 +1,11 @@
 export { Dashboard } from './Dashboard';
+export { AdminLogin } from './Login';
+export { AdminGoods } from './Goods';
+export { AdminGoodsCreate } from './GoodsCreate';
+export { AdminGoodsEdit } from './GoodsEdit';
+export { AdminSeckill } from './Seckill';
+export { AdminSeckillCreate } from './SeckillCreate';
+export { AdminSeckillEdit } from './SeckillEdit';
+export { AdminSeckillStats } from './SeckillStats';
+export { AdminOrders } from './Orders';
+export { AdminUsers } from './Users';

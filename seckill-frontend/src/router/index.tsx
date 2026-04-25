@@ -1,124 +1,181 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
-import { AdminLayout } from '../layouts';
-import { Login, Home, Orders, Profile } from '../pages';
-import { Dashboard } from '../pages/Admin';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
+import { MobileLayout, AdminLayout } from '../layouts';
+import {
+  Login,
+  Home,
+  Register,
+  GoodsList,
+  GoodsDetail,
+  SeckillList,
+  SeckillDetail,
+  SeckillBuy,
+  SeckillResult,
+  Orders,
+  OrderDetail,
+  Pay,
+  Profile,
+  Address,
+  Settings,
+} from '../pages';
+import {
+  Dashboard,
+  AdminLogin,
+  AdminGoods,
+  AdminGoodsCreate,
+  AdminGoodsEdit,
+  AdminSeckill,
+  AdminSeckillCreate,
+  AdminSeckillEdit,
+  AdminSeckillStats,
+  AdminOrders,
+  AdminUsers,
+} from '../pages/Admin';
+import { UserAuthRoute, AdminAuthRoute } from './guards';
 
-// 用户端路由
-const mobileRoutes = [
+// 用户端路由配置
+const mobileRoutes: RouteObject[] = [
   {
     path: '/login',
     element: <Login />,
   },
   {
-    path: '/',
-    element: <Home />,
+    path: '/register',
+    element: <Register />,
   },
   {
-    path: '/goods',
-    element: <div>商品列表页（待实现）</div>,
-  },
-  {
-    path: '/goods/:id',
-    element: <div>商品详情页（待实现）</div>,
-  },
-  {
-    path: '/seckill/:id',
-    element: <div>秒杀活动详情页（待实现）</div>,
-  },
-  {
-    path: '/seckill/:id/buy',
-    element: <div>秒杀抢购页（待实现）</div>,
-  },
-  {
-    path: '/seckill/result/:recordId',
-    element: <div>秒杀结果页（待实现）</div>,
-  },
-  {
-    path: '/orders',
-    element: <Orders />,
-  },
-  {
-    path: '/order/:orderNo',
-    element: <div>订单详情页（待实现）</div>,
-  },
-  {
-    path: '/pay/:orderNo',
-    element: <div>支付页（待实现）</div>,
-  },
-  {
-    path: '/profile',
-    element: <Profile />,
-  },
-  {
-    path: '/address',
-    element: <div>收货地址页（待实现）</div>,
-  },
-  {
-    path: '/settings',
-    element: <div>设置页（待实现）</div>,
+    element: <UserAuthRoute />,
+    children: [
+      {
+        path: '/home',
+        element: <MobileLayout title="首页" showBack={false} showTabBar={true}><Home /></MobileLayout>,
+      },
+      {
+        path: '/',
+        element: <Navigate to="/home" replace />,
+      },
+      {
+        path: '/goods',
+        element: <MobileLayout title="商品列表" showBack={true} showTabBar={true}><GoodsList /></MobileLayout>,
+      },
+      {
+        path: '/goods/:id',
+        element: <MobileLayout title="商品详情" showBack={true} showTabBar={false}><GoodsDetail /></MobileLayout>,
+      },
+      {
+        path: '/seckill',
+        element: <MobileLayout title="秒杀活动" showBack={true} showTabBar={true}><SeckillList /></MobileLayout>,
+      },
+      {
+        path: '/seckill/:id',
+        element: <MobileLayout title="秒杀活动详情" showBack={true} showTabBar={false}><SeckillDetail /></MobileLayout>,
+      },
+      {
+        path: '/seckill/:id/buy',
+        element: <MobileLayout title="抢购确认" showBack={true} showTabBar={false}><SeckillBuy /></MobileLayout>,
+      },
+      {
+        path: '/seckill/result/:recordId',
+        element: <MobileLayout title="秒杀结果" showBack={true} showTabBar={false}><SeckillResult /></MobileLayout>,
+      },
+      {
+        path: '/orders',
+        element: <MobileLayout title="我的订单" showBack={true} showTabBar={true}><Orders /></MobileLayout>,
+      },
+      {
+        path: '/order/:orderNo',
+        element: <MobileLayout title="订单详情" showBack={true} showTabBar={false}><OrderDetail /></MobileLayout>,
+      },
+      {
+        path: '/pay/:orderNo',
+        element: <MobileLayout title="支付" showBack={true} showTabBar={false}><Pay /></MobileLayout>,
+      },
+      {
+        path: '/profile',
+        element: <MobileLayout title="个人中心" showBack={false} showTabBar={true}><Profile /></MobileLayout>,
+      },
+      {
+        path: '/address',
+        element: <MobileLayout title="收货地址" showBack={true} showTabBar={false}><Address /></MobileLayout>,
+      },
+      {
+        path: '/settings',
+        element: <MobileLayout title="设置" showBack={true} showTabBar={false}><Settings /></MobileLayout>,
+      },
+    ],
   },
 ];
 
-// 管理后台路由
-const adminRoutes = {
+// 管理后台路由配置（不需要管理员权限的路由）
+const adminPublicRoutes: RouteObject[] = [
+  {
+    path: '/admin/login',
+    element: <AdminLogin />,
+  },
+];
+
+// 管理后台路由配置（需要管理员权限的路由）
+const adminAuthRoutes: RouteObject = {
   path: '/admin',
-  element: <AdminLayout />,
+  element: <AdminAuthRoute />,
   children: [
     {
-      index: true,
-      element: <Dashboard />,
-    },
-    {
-      path: 'goods',
-      element: <div>商品管理页（待实现）</div>,
-    },
-    {
-      path: 'goods/create',
-      element: <div>新增商品页（待实现）</div>,
-    },
-    {
-      path: 'goods/:id/edit',
-      element: <div>编辑商品页（待实现）</div>,
-    },
-    {
-      path: 'seckill',
-      element: <div>秒杀活动列表页（待实现）</div>,
-    },
-    {
-      path: 'seckill/create',
-      element: <div>创建秒杀活动页（待实现）</div>,
-    },
-    {
-      path: 'seckill/:id/edit',
-      element: <div>编辑秒杀活动页（待实现）</div>,
-    },
-    {
-      path: 'seckill/:id/stats',
-      element: <div>活动统计页（待实现）</div>,
-    },
-    {
-      path: 'orders',
-      element: <div>订单管理页（待实现）</div>,
-    },
-    {
-      path: 'users',
-      element: <div>用户管理页（待实现）</div>,
+      element: <AdminLayout />,
+      children: [
+        {
+          index: true,
+          element: <Dashboard />,
+        },
+        {
+          path: 'dashboard',
+          element: <Dashboard />,
+        },
+        {
+          path: 'goods',
+          element: <AdminGoods />,
+        },
+        {
+          path: 'goods/create',
+          element: <AdminGoodsCreate />,
+        },
+        {
+          path: 'goods/:id/edit',
+          element: <AdminGoodsEdit />,
+        },
+        {
+          path: 'seckill',
+          element: <AdminSeckill />,
+        },
+        {
+          path: 'seckill/create',
+          element: <AdminSeckillCreate />,
+        },
+        {
+          path: 'seckill/:id/edit',
+          element: <AdminSeckillEdit />,
+        },
+        {
+          path: 'seckill/:id/stats',
+          element: <AdminSeckillStats />,
+        },
+        {
+          path: 'orders',
+          element: <AdminOrders />,
+        },
+        {
+          path: 'users',
+          element: <AdminUsers />,
+        },
+      ],
     },
   ],
 };
 
-// 管理后台登录页
-const adminLoginRoute = {
-  path: '/admin/login',
-  element: <div>管理员登录页（待实现）</div>,
-};
-
 export const router = createBrowserRouter([
   ...mobileRoutes,
-  adminRoutes,
-  adminLoginRoute,
+  ...adminPublicRoutes,
+  adminAuthRoutes,
   {
     path: '*',
-    element: <Navigate to="/" replace />,
+    element: <Navigate to="/home" replace />,
   },
 ]);

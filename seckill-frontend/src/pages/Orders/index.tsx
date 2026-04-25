@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Tabs, Empty, PullToRefresh } from 'antd-mobile';
-import { MobileLayout } from '../../layouts';
 import { OrderCard } from '../../components';
 import type { Order } from '../../types';
 import { ORDER_STATUS } from '../../utils/constants';
@@ -85,7 +84,7 @@ const tabs = [
 
 export function Orders() {
   const [activeTab, setActiveTab] = useState('all');
-  const [orders, setOrders] = useState(mockOrders);
+  const [orders] = useState(mockOrders);
 
   const getFilteredOrders = () => {
     if (activeTab === 'all') return orders;
@@ -116,7 +115,6 @@ export function Orders() {
   const filteredOrders = getFilteredOrders();
 
   return (
-    <MobileLayout title="我的订单" showTabBar>
       <div className="orders-page">
         <Tabs activeKey={activeTab} onChange={setActiveTab} className="order-tabs">
           {tabs.map((tab) => (
@@ -144,6 +142,5 @@ export function Orders() {
           </div>
         </PullToRefresh>
       </div>
-    </MobileLayout>
   );
 }

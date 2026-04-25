@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SeckillPathService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-seckill</a> &gt; <a href="index.source.html" class="el_package">com.seckill.seckill.service</a> &gt; <span class="el_source">SeckillPathService.java</span></div><h1>SeckillPathService.java</h1><pre class="source lang-java linenums">package com.seckill.seckill.service;
+
+import cn.hutool.crypto.digest.DigestUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.seckill.common.enums.ResponseCodeEnum;
+import com.seckill.common.exception.BusinessException;
+import com.seckill.goods.entity.SeckillActivity;
+import com.seckill.goods.entity.SeckillGoods;
+import com.seckill.goods.mapper.SeckillActivityMapper;
+import com.seckill.goods.mapper.SeckillGoodsMapper;
+import com.seckill.infrastructure.utils.RedisOperations;
+import com.seckill.infrastructure.utils.RedisUtils;
+import com.seckill.seckill.config.SeckillProperties;
+import com.seckill.seckill.dto.SeckillPathResponse;
+import com.seckill.seckill.support.SeckillRedisKeys;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.concurrent.TimeUnit;
+
+@Service
+public class SeckillPathService {
+
+<span class="fc" id="L26">    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd HH:mm:ss&quot;);</span>
+
+    private final SeckillActivityMapper seckillActivityMapper;
+    private final SeckillGoodsMapper seckillGoodsMapper;
+    private final RedisUtils redisUtils;
+    private final RedisOperations redisOperations;
+    private final SeckillProperties seckillProperties;
+
+    @Autowired
+    public SeckillPathService(SeckillActivityMapper seckillActivityMapper,
+                              SeckillGoodsMapper seckillGoodsMapper,
+                              RedisUtils redisUtils,
+                              RedisOperations redisOperations,
+<span class="fc" id="L39">                              SeckillProperties seckillProperties) {</span>
+<span class="fc" id="L40">        this.seckillActivityMapper = seckillActivityMapper;</span>
+<span class="fc" id="L41">        this.seckillGoodsMapper = seckillGoodsMapper;</span>
+<span class="fc" id="L42">        this.redisUtils = redisUtils;</span>
+<span class="fc" id="L43">        this.redisOperations = redisOperations;</span>
+<span class="fc" id="L44">        this.seckillProperties = seckillProperties;</span>
+<span class="fc" id="L45">    }</span>
+
+    public SeckillPathResponse createPath(Long userId, Long activityId, Long goodsId) {
+<span class="fc" id="L48">        SeckillActivity activity = requireActivity(activityId);</span>
+<span class="fc" id="L49">        requireSeckillGoods(activityId, goodsId);</span>
+<span class="fc" id="L50">        validatePathWindow(activity);</span>
+
+<span class="fc" id="L52">        String countKey = SeckillRedisKeys.pathAcquireCount(userId, activityId, goodsId);</span>
+<span class="fc" id="L53">        Long count = redisOperations.increment(countKey);</span>
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">        if (count != null &amp;&amp; count == 1L) {</span>
+<span class="fc" id="L55">            redisOperations.expire(countKey, seckillProperties.getPathTtlSeconds(), TimeUnit.SECONDS);</span>
+        }
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">        if (count != null &amp;&amp; count &gt; seckillProperties.getPathMaxAcquireCount()) {</span>
+<span class="fc" id="L58">            throw new BusinessException(ResponseCodeEnum.RATE_LIMIT, &quot;秒杀地址获取次数过多，请稍后重试&quot;);</span>
+        }
+
+<span class="fc" id="L61">        String rawPath = DigestUtil.md5Hex(userId + &quot;:&quot; + activityId + &quot;:&quot; + goodsId + &quot;:&quot; + System.nanoTime());</span>
+<span class="fc" id="L62">        redisUtils.set(SeckillRedisKeys.path(userId, activityId, goodsId), rawPath, seckillProperties.getPathTtlSeconds(), TimeUnit.SECONDS);</span>
+
+<span class="fc" id="L64">        SeckillPathResponse response = new SeckillPathResponse();</span>
+<span class="fc" id="L65">        response.setSeckillPath(&quot;/&quot; + rawPath);</span>
+<span class="fc" id="L66">        response.setExpiresAt(LocalDateTime.now().plusSeconds(seckillProperties.getPathTtlSeconds()).format(DATE_TIME_FORMATTER));</span>
+<span class="fc" id="L67">        return response;</span>
+    }
+
+    public void validatePath(Long userId, Long activityId, Long goodsId, String seckillPath) {
+<span class="fc" id="L71">        String expected = redisUtils.get(SeckillRedisKeys.path(userId, activityId, goodsId));</span>
+<span class="fc" id="L72">        String normalized = normalizePath(seckillPath);</span>
+<span class="fc bfc" id="L73" title="All 4 branches covered.">        if (expected == null || !expected.equals(normalized)) {</span>
+<span class="fc" id="L74">            throw new BusinessException(ResponseCodeEnum.SECKILL_PATH_INVALID);</span>
+        }
+<span class="fc" id="L76">    }</span>
+
+    public SeckillActivity requireActivity(Long activityId) {
+<span class="fc" id="L79">        SeckillActivity activity = seckillActivityMapper.selectById(activityId);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (activity == null) {</span>
+<span class="fc" id="L81">            throw new BusinessException(ResponseCodeEnum.SECKILL_NOT_FOUND);</span>
+        }
+<span class="fc" id="L83">        return activity;</span>
+    }
+
+    public SeckillGoods requireSeckillGoods(Long activityId, Long goodsId) {
+<span class="fc" id="L87">        SeckillGoods seckillGoods = seckillGoodsMapper.selectOne(new LambdaQueryWrapper&lt;SeckillGoods&gt;()</span>
+<span class="fc" id="L88">                .eq(SeckillGoods::getActivityId, activityId)</span>
+<span class="fc" id="L89">                .eq(SeckillGoods::getGoodsId, goodsId)</span>
+<span class="fc" id="L90">                .last(&quot;LIMIT 1&quot;));</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (seckillGoods == null) {</span>
+<span class="fc" id="L92">            throw new BusinessException(ResponseCodeEnum.SECKILL_NOT_FOUND, &quot;秒杀商品不存在&quot;);</span>
+        }
+<span class="fc" id="L94">        return seckillGoods;</span>
+    }
+
+    public void validateExecuteWindow(SeckillActivity activity) {
+<span class="fc" id="L98">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">        if (activity.getStartTime() != null &amp;&amp; now.isBefore(activity.getStartTime())) {</span>
+<span class="fc" id="L100">            throw new BusinessException(ResponseCodeEnum.SECKILL_NOT_START);</span>
+        }
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        if (activity.getEndTime() != null &amp;&amp; now.isAfter(activity.getEndTime())) {</span>
+<span class="fc" id="L103">            throw new BusinessException(ResponseCodeEnum.SECKILL_ENDED);</span>
+        }
+<span class="fc" id="L105">    }</span>
+
+    private void validatePathWindow(SeckillActivity activity) {
+<span class="fc" id="L108">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L109">        LocalDateTime start = activity.getStartTime();</span>
+<span class="fc" id="L110">        LocalDateTime end = activity.getEndTime();</span>
+<span class="pc bpc" id="L111" title="1 of 4 branches missed.">        if (start != null &amp;&amp; now.isBefore(start.minusMinutes(5))) {</span>
+<span class="fc" id="L112">            throw new BusinessException(ResponseCodeEnum.SECKILL_NOT_START);</span>
+        }
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">        if (end != null &amp;&amp; now.isAfter(end)) {</span>
+<span class="fc" id="L115">            throw new BusinessException(ResponseCodeEnum.SECKILL_ENDED);</span>
+        }
+<span class="fc" id="L117">    }</span>
+
+    private String normalizePath(String seckillPath) {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        return seckillPath == null ? null : seckillPath.replaceFirst(&quot;^/+&quot;, &quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

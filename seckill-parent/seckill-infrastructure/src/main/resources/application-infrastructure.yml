@@ -11,20 +11,13 @@ spring:
     username: root
     password: root123
     hikari:
-      # 连接池名称
       pool-name: SeckillHikariPool
-      # 最小空闲连接数
-      minimum-idle: 5
-      # 最大连接数
-      maximum-pool-size: 20
-      # 连接空闲超时时间（毫秒）
+      minimum-idle: 10
+      maximum-pool-size: 50
       idle-timeout: 300000
-      # 连接最大存活时间（毫秒）
       max-lifetime: 1200000
-      # 连接超时时间（毫秒）
       connection-timeout: 20000
-      # 测试连接是否可用的 SQL
-      connection-test-query: SELECT 1
+      keepalive-time: 60000
 
   # Redis 配置
   data:
@@ -36,14 +29,10 @@ spring:
       timeout: 10s
       lettuce:
         pool:
-          # 最大活跃连接数
-          max-active: 8
-          # 最大空闲连接数
-          max-idle: 8
-          # 最小空闲连接数
-          min-idle: 0
-          # 最大等待时间
-          max-wait: 100ms
+          max-active: 50
+          max-idle: 30
+          min-idle: 10
+          max-wait: 3s
 
   # RabbitMQ 配置
   rabbitmq:
@@ -59,14 +48,10 @@ spring:
     publisher-returns: true
     listener:
       simple:
-        # 手动确认
         acknowledge-mode: manual
-        # 并发消费者数量
-        concurrency: 5
-        # 最大并发消费者数量
-        max-concurrency: 10
-        # 每次从队列获取的消息数量
-        prefetch: 1
+        concurrency: 10
+        max-concurrency: 30
+        prefetch: 20
 
 # MyBatis-Plus 配置
 mybatis-plus:

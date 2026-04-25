@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SeckillOrderConsumer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-seckill</a> &gt; <a href="index.source.html" class="el_package">com.seckill.seckill.mq</a> &gt; <span class="el_source">SeckillOrderConsumer.java</span></div><h1>SeckillOrderConsumer.java</h1><pre class="source lang-java linenums">package com.seckill.seckill.mq;
+
+import com.rabbitmq.client.Channel;
+import com.seckill.common.exception.BusinessException;
+import com.seckill.common.enums.SeckillRecordStatusEnum;
+import com.seckill.goods.entity.Goods;
+import com.seckill.goods.entity.SeckillGoods;
+import com.seckill.goods.mapper.GoodsMapper;
+import com.seckill.order.dto.CreateSeckillOrderCommand;
+import com.seckill.order.dto.CreateSeckillOrderResult;
+import com.seckill.order.service.OrderCreateService;
+import com.seckill.seckill.entity.SeckillRecord;
+import com.seckill.seckill.mapper.SeckillRecordMapper;
+import com.seckill.seckill.service.SeckillPathService;
+import com.seckill.seckill.service.SeckillRecordService;
+import com.seckill.seckill.service.StockService;
+import com.seckill.infrastructure.config.RabbitMQConfig;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+
+<span class="fc" id="L26">@Slf4j</span>
+@Component
+<span class="fc" id="L28">@RequiredArgsConstructor</span>
+public class SeckillOrderConsumer {
+
+    private static final int MAX_RETRY_COUNT = 2;
+
+    private final OrderCreateService orderCreateService;
+    private final SeckillRecordService seckillRecordService;
+    private final SeckillRecordMapper seckillRecordMapper;
+    private final GoodsMapper goodsMapper;
+    private final SeckillPathService seckillPathService;
+    private final StockService stockService;
+    private final SeckillOrderProducer seckillOrderProducer;
+
+    @RabbitListener(queues = RabbitMQConfig.SECKILL_ORDER_QUEUE)
+    public void consume(SeckillOrderMessage payload, Message message, Channel channel) throws IOException {
+<span class="fc" id="L43">        long deliveryTag = message.getMessageProperties().getDeliveryTag();</span>
+<span class="fc" id="L44">        SeckillRecord record = seckillRecordMapper.selectById(payload.getRecordId());</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (record == null</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">                || record.getStatus().equals(SeckillRecordStatusEnum.SUCCESS.getCode())</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                || record.getStatus().equals(SeckillRecordStatusEnum.FAILED.getCode())) {</span>
+<span class="fc" id="L48">            channel.basicAck(deliveryTag, false);</span>
+<span class="fc" id="L49">            return;</span>
+        }
+
+<span class="fc" id="L52">        Goods goods = null;</span>
+<span class="fc" id="L53">        SeckillGoods seckillGoods = null;</span>
+
+        try {
+<span class="fc" id="L56">            goods = goodsMapper.selectById(payload.getGoodsId());</span>
+<span class="fc" id="L57">            seckillGoods = seckillPathService.requireSeckillGoods(payload.getActivityId(), payload.getGoodsId());</span>
+
+<span class="fc" id="L59">            CreateSeckillOrderCommand command = new CreateSeckillOrderCommand();</span>
+<span class="fc" id="L60">            command.setRecordId(payload.getRecordId());</span>
+<span class="fc" id="L61">            command.setOrderNo(payload.getOrderNo());</span>
+<span class="fc" id="L62">            command.setUserId(payload.getUserId());</span>
+<span class="fc" id="L63">            command.setActivityId(payload.getActivityId());</span>
+<span class="fc" id="L64">            command.setGoodsId(payload.getGoodsId());</span>
+<span class="fc" id="L65">            command.setQuantity(payload.getQuantity());</span>
+<span class="fc" id="L66">            command.setAddressId(payload.getAddressId());</span>
+<span class="fc" id="L67">            command.setReceiverName(payload.getReceiverName());</span>
+<span class="fc" id="L68">            command.setReceiverPhone(payload.getReceiverPhone());</span>
+<span class="fc" id="L69">            command.setReceiverAddress(payload.getReceiverAddress());</span>
+
+<span class="fc" id="L71">            CreateSeckillOrderResult result = orderCreateService.createSeckillOrder(command);</span>
+<span class="fc" id="L72">            seckillRecordService.markSuccess(payload.getRecordId(), result.getOrderId(), result.getOrderNo(), goods, seckillGoods);</span>
+<span class="fc" id="L73">            channel.basicAck(deliveryTag, false);</span>
+<span class="fc" id="L74">        } catch (Exception ex) {</span>
+<span class="fc" id="L75">            int retryCount = resolveRetryCount(message);</span>
+<span class="fc" id="L76">            log.error(&quot;处理秒杀订单失败, recordId={}, retryCount={}&quot;, payload.getRecordId(), retryCount, ex);</span>
+
+<span class="fc bfc" id="L78" title="All 4 branches covered.">            if (retryCount &lt; MAX_RETRY_COUNT &amp;&amp; shouldRetry(ex)) {</span>
+<span class="fc" id="L79">                retryOrRequeue(payload, deliveryTag, retryCount, channel);</span>
+<span class="fc" id="L80">                return;</span>
+            }
+
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            if (goods == null) {</span>
+<span class="fc" id="L84">                goods = goodsMapper.selectById(payload.getGoodsId());</span>
+            }
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (seckillGoods == null) {</span>
+<span class="fc" id="L87">                seckillGoods = loadSeckillGoods(payload.getActivityId(), payload.getGoodsId());</span>
+            }
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            if (!record.getStatus().equals(SeckillRecordStatusEnum.FAILED.getCode())) {</span>
+<span class="fc" id="L90">                seckillRecordService.markFailed(payload.getRecordId(), buildFailureReason(ex), goods, seckillGoods);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                stockService.rollback(payload.getActivityId(), payload.getGoodsId(), payload.getUserId(), payload.getQuantity() == null ? 1 : payload.getQuantity());</span>
+            }
+<span class="fc" id="L93">            channel.basicReject(deliveryTag, false);</span>
+<span class="fc" id="L94">        }</span>
+<span class="fc" id="L95">    }</span>
+
+    private void retryOrRequeue(SeckillOrderMessage payload, long deliveryTag, int retryCount, Channel channel) throws IOException {
+        try {
+<span class="fc" id="L99">            seckillOrderProducer.send(payload, retryCount + 1);</span>
+<span class="fc" id="L100">            channel.basicAck(deliveryTag, false);</span>
+<span class="fc" id="L101">        } catch (Exception retryEx) {</span>
+<span class="fc" id="L102">            log.error(&quot;重投秒杀消息失败, recordId={}, retryCount={}&quot;, payload.getRecordId(), retryCount + 1, retryEx);</span>
+<span class="fc" id="L103">            channel.basicNack(deliveryTag, false, true);</span>
+<span class="fc" id="L104">        }</span>
+<span class="fc" id="L105">    }</span>
+
+    private int resolveRetryCount(Message message) {
+<span class="fc" id="L108">        Object retryCount = message.getMessageProperties().getHeaders().get(SeckillOrderProducer.RETRY_COUNT_HEADER);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (retryCount instanceof Number number) {</span>
+<span class="fc" id="L110">            return number.intValue();</span>
+        }
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (retryCount instanceof String value) {</span>
+            try {
+<span class="fc" id="L114">                return Integer.parseInt(value);</span>
+<span class="nc" id="L115">            } catch (NumberFormatException ignored) {</span>
+<span class="nc" id="L116">                return 0;</span>
+            }
+        }
+<span class="fc" id="L119">        return 0;</span>
+    }
+
+    private boolean shouldRetry(Exception ex) {
+<span class="fc" id="L123">        return !(ex instanceof BusinessException businessException</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                &amp;&amp; businessException.getCode() != null</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                &amp;&amp; businessException.getCode() &gt;= 40000</span>
+<span class="pc bpc" id="L126" title="1 of 6 branches missed.">                &amp;&amp; businessException.getCode() &lt; 50000);</span>
+    }
+
+    private String buildFailureReason(Exception ex) {
+<span class="fc" id="L130">        String message = ex.getMessage();</span>
+<span class="fc bfc" id="L131" title="All 4 branches covered.">        return (message == null || message.isBlank()) ? &quot;秒杀下单失败&quot; : message;</span>
+    }
+
+    private SeckillGoods loadSeckillGoods(Long activityId, Long goodsId) {
+        try {
+<span class="fc" id="L136">            return seckillPathService.requireSeckillGoods(activityId, goodsId);</span>
+<span class="fc" id="L137">        } catch (Exception ex) {</span>
+<span class="fc" id="L138">            log.warn(&quot;加载秒杀商品失败, activityId={}, goodsId={}&quot;, activityId, goodsId, ex);</span>
+<span class="fc" id="L139">            return null;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

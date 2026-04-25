@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PayServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-order</a> &gt; <a href="index.source.html" class="el_package">com.seckill.order.service.impl</a> &gt; <span class="el_source">PayServiceImpl.java</span></div><h1>PayServiceImpl.java</h1><pre class="source lang-java linenums">package com.seckill.order.service.impl;
+
+import com.seckill.common.enums.OrderStatusEnum;
+import com.seckill.common.enums.PayStatusEnum;
+import com.seckill.common.enums.PayTypeEnum;
+import com.seckill.common.enums.ResponseCodeEnum;
+import com.seckill.common.exception.BusinessException;
+import com.seckill.common.utils.SnowflakeIdWorker;
+import com.seckill.common.utils.UserContext;
+import com.seckill.infrastructure.config.RabbitMQConfig;
+import com.seckill.infrastructure.utils.RedisOperations;
+import com.seckill.order.dto.PayCreateResponse;
+import com.seckill.order.dto.PayStatusResponse;
+import com.seckill.order.entity.Order;
+import com.seckill.order.entity.PayRecord;
+import com.seckill.order.mapper.OrderMapper;
+import com.seckill.order.mapper.PayRecordMapper;
+import com.seckill.order.service.PayService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitOperations;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * 支付服务实现
+ */
+<span class="fc" id="L33">@Slf4j</span>
+@Service
+public class PayServiceImpl implements PayService {
+
+    private final OrderMapper orderMapper;
+    private final PayRecordMapper payRecordMapper;
+    private final RedisOperations redisOperations;
+    private final RabbitOperations rabbitOperations;
+    private final SnowflakeIdWorker snowflakeIdWorker;
+
+    @Autowired
+    public PayServiceImpl(OrderMapper orderMapper,
+                          PayRecordMapper payRecordMapper,
+                          RedisOperations redisOperations,
+                          RabbitOperations rabbitOperations,
+<span class="fc" id="L48">                          SnowflakeIdWorker snowflakeIdWorker) {</span>
+<span class="fc" id="L49">        this.orderMapper = orderMapper;</span>
+<span class="fc" id="L50">        this.payRecordMapper = payRecordMapper;</span>
+<span class="fc" id="L51">        this.redisOperations = redisOperations;</span>
+<span class="fc" id="L52">        this.rabbitOperations = rabbitOperations;</span>
+<span class="fc" id="L53">        this.snowflakeIdWorker = snowflakeIdWorker;</span>
+<span class="fc" id="L54">    }</span>
+
+    /**
+     * 支付状态缓存前缀
+     */
+    private static final String PAY_STATUS_CACHE_PREFIX = &quot;seckill:pay:status:&quot;;
+
+    /**
+     * 支付状态缓存时间（分钟）
+     */
+    private static final long PAY_STATUS_CACHE_MINUTES = 5;
+
+    /**
+     * 订单超时时间（分钟）
+     */
+    private static final int ORDER_TIMEOUT_MINUTES = 15;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public PayCreateResponse createPay(String orderNo, Integer payType) {
+<span class="fc" id="L74">        Long userId = UserContext.getCurrentUserId();</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (userId == null) {</span>
+<span class="nc" id="L76">            throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED);</span>
+        }
+
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (!StringUtils.hasText(orderNo)) {</span>
+<span class="nc" id="L80">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;订单编号不能为空&quot;);</span>
+        }
+
+        // 校验支付方式
+<span class="fc" id="L84">        PayTypeEnum payTypeEnum = PayTypeEnum.getByCode(payType);</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (payTypeEnum == null) {</span>
+<span class="fc" id="L86">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;支付方式不正确&quot;);</span>
+        }
+
+        // 查询订单
+<span class="fc" id="L90">        Order order = orderMapper.selectOwnedOrder(orderNo, userId);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (order == null) {</span>
+<span class="fc" id="L92">            throw new BusinessException(ResponseCodeEnum.ORDER_NOT_FOUND);</span>
+        }
+
+        // 校验订单状态
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (!OrderStatusEnum.allowPay(order.getStatus())) {</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">            if (OrderStatusEnum.PAID.getCode().equals(order.getStatus())) {</span>
+<span class="fc" id="L98">                throw new BusinessException(ResponseCodeEnum.ORDER_ALREADY_PAID);</span>
+            }
+<span class="nc" id="L100">            throw new BusinessException(ResponseCodeEnum.ORDER_STATUS_ERROR, &quot;当前订单状态不允许支付&quot;);</span>
+        }
+
+        // 检查是否已存在待支付记录
+<span class="fc" id="L104">        PayRecord existRecord = payRecordMapper.selectByOrderNo(orderNo);</span>
+<span class="pc bpc" id="L105" title="1 of 4 branches missed.">        if (existRecord != null &amp;&amp; PayStatusEnum.PENDING.getCode().equals(existRecord.getStatus())) {</span>
+            // 返回已有的支付记录
+<span class="fc" id="L107">            return buildPayCreateResponse(existRecord, order);</span>
+        }
+
+        // 创建支付记录
+<span class="fc" id="L111">        PayRecord payRecord = new PayRecord();</span>
+<span class="fc" id="L112">        payRecord.setPayNo(generatePayNo());</span>
+<span class="fc" id="L113">        payRecord.setOrderNo(orderNo);</span>
+<span class="fc" id="L114">        payRecord.setPayMethod(payType);</span>
+<span class="fc" id="L115">        payRecord.setPayAmount(order.getOrderPrice());</span>
+<span class="fc" id="L116">        payRecord.setStatus(PayStatusEnum.PENDING.getCode());</span>
+<span class="fc" id="L117">        payRecord.setCreateTime(LocalDateTime.now());</span>
+<span class="fc" id="L118">        payRecord.setUpdateTime(LocalDateTime.now());</span>
+<span class="fc" id="L119">        payRecordMapper.insert(payRecord);</span>
+
+<span class="fc" id="L121">        log.info(&quot;创建支付记录成功, payNo={}, orderNo={}, userId={}, amount={}&quot;,</span>
+<span class="fc" id="L122">                payRecord.getPayNo(), orderNo, userId, payRecord.getPayAmount());</span>
+
+<span class="fc" id="L124">        return buildPayCreateResponse(payRecord, order);</span>
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void payCallback(String payNo, String tradeNo) {
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (!StringUtils.hasText(payNo)) {</span>
+<span class="nc" id="L131">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;支付流水号不能为空&quot;);</span>
+        }
+
+        // 查询支付记录
+<span class="fc" id="L135">        PayRecord payRecord = payRecordMapper.selectByPayNo(payNo);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (payRecord == null) {</span>
+<span class="fc" id="L137">            throw new BusinessException(ResponseCodeEnum.NOT_FOUND, &quot;支付记录不存在&quot;);</span>
+        }
+
+        // 幂等性校验：已支付的直接返回
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (PayStatusEnum.PAID.getCode().equals(payRecord.getStatus())) {</span>
+<span class="fc" id="L142">            log.info(&quot;支付记录已处理, payNo={}&quot;, payNo);</span>
+<span class="fc" id="L143">            return;</span>
+        }
+
+        // 校验支付状态
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (!PayStatusEnum.PENDING.getCode().equals(payRecord.getStatus())) {</span>
+<span class="nc" id="L148">            throw new BusinessException(ResponseCodeEnum.ORDER_STATUS_ERROR, &quot;支付状态异常&quot;);</span>
+        }
+
+<span class="fc" id="L151">        String orderNo = payRecord.getOrderNo();</span>
+
+        // 更新支付记录状态
+<span class="fc" id="L154">        LocalDateTime payTime = LocalDateTime.now();</span>
+<span class="fc" id="L155">        int affected = payRecordMapper.updateStatus(</span>
+                payNo,
+<span class="fc" id="L157">                PayStatusEnum.PAID.getCode(),</span>
+                tradeNo,
+                payTime
+        );
+
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (affected &lt; 1) {</span>
+<span class="nc" id="L163">            log.warn(&quot;支付状态更新失败，可能已被处理, payNo={}&quot;, payNo);</span>
+<span class="nc" id="L164">            return;</span>
+        }
+
+        // 更新订单状态为已支付
+<span class="fc" id="L168">        Order order = orderMapper.selectByOrderNo(orderNo);</span>
+<span class="pc bpc" id="L169" title="2 of 4 branches missed.">        if (order != null &amp;&amp; OrderStatusEnum.PENDING_PAY.getCode().equals(order.getStatus())) {</span>
+<span class="fc" id="L170">            order.setStatus(OrderStatusEnum.PAID.getCode());</span>
+<span class="fc" id="L171">            order.setPayType(payRecord.getPayMethod());</span>
+<span class="fc" id="L172">            order.setPayTime(payTime);</span>
+<span class="fc" id="L173">            order.setUpdateTime(payTime);</span>
+<span class="fc" id="L174">            orderMapper.updateById(order);</span>
+
+<span class="fc" id="L176">            log.info(&quot;订单支付成功, orderNo={}, payNo={}, amount={}&quot;,</span>
+<span class="fc" id="L177">                    orderNo, payNo, payRecord.getPayAmount());</span>
+
+            // 发送支付成功消息
+<span class="fc" id="L180">            sendPaySuccessMessage(orderNo, payNo);</span>
+        }
+
+        // 更新缓存
+<span class="fc" id="L184">        updatePayStatusCache(orderNo, PayStatusEnum.PAID.getCode());</span>
+<span class="fc" id="L185">    }</span>
+
+    @Override
+    public PayStatusResponse queryPayStatus(String orderNo) {
+<span class="fc" id="L189">        Long userId = UserContext.getCurrentUserId();</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (userId == null) {</span>
+<span class="nc" id="L191">            throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED);</span>
+        }
+
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (!StringUtils.hasText(orderNo)) {</span>
+<span class="nc" id="L195">            throw new BusinessException(ResponseCodeEnum.PARAM_ERROR, &quot;订单编号不能为空&quot;);</span>
+        }
+
+        // 先查缓存
+<span class="fc" id="L199">        String cacheKey = PAY_STATUS_CACHE_PREFIX + orderNo;</span>
+<span class="fc" id="L200">        String cachedStatus = redisOperations.get(cacheKey);</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (cachedStatus != null) {</span>
+            // 缓存命中，直接返回
+<span class="nc" id="L203">            PayRecord payRecord = payRecordMapper.selectByOrderNo(orderNo);</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">            if (payRecord != null) {</span>
+<span class="nc" id="L205">                return buildPayStatusResponse(payRecord);</span>
+            }
+        }
+
+        // 查询订单
+<span class="fc" id="L210">        Order order = orderMapper.selectOwnedOrder(orderNo, userId);</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (order == null) {</span>
+<span class="fc" id="L212">            throw new BusinessException(ResponseCodeEnum.ORDER_NOT_FOUND);</span>
+        }
+
+        // 查询支付记录
+<span class="fc" id="L216">        PayRecord payRecord = payRecordMapper.selectByOrderNo(orderNo);</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (payRecord == null) {</span>
+            // 未创建支付记录
+<span class="fc" id="L219">            PayStatusResponse response = new PayStatusResponse();</span>
+<span class="fc" id="L220">            response.setOrderNo(orderNo);</span>
+<span class="fc" id="L221">            response.setStatus(PayStatusEnum.PENDING.getCode());</span>
+<span class="fc" id="L222">            response.setStatusDesc(PayStatusEnum.PENDING.getDesc());</span>
+<span class="fc" id="L223">            return response;</span>
+        }
+
+        // 更新缓存
+<span class="fc" id="L227">        updatePayStatusCache(orderNo, payRecord.getStatus());</span>
+
+<span class="fc" id="L229">        return buildPayStatusResponse(payRecord);</span>
+    }
+
+    /**
+     * 生成支付流水号
+     */
+    private String generatePayNo() {
+<span class="fc" id="L236">        String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern(&quot;yyyyMMdd&quot;));</span>
+<span class="fc" id="L237">        long id = snowflakeIdWorker.nextId();</span>
+<span class="fc" id="L238">        return &quot;PAY&quot; + dateStr + String.format(&quot;%010d&quot;, id % 10000000000L);</span>
+    }
+
+    /**
+     * 构建支付创建响应
+     */
+    private PayCreateResponse buildPayCreateResponse(PayRecord payRecord, Order order) {
+<span class="fc" id="L245">        PayCreateResponse response = new PayCreateResponse();</span>
+<span class="fc" id="L246">        response.setPayNo(payRecord.getPayNo());</span>
+<span class="fc" id="L247">        response.setOrderNo(payRecord.getOrderNo());</span>
+<span class="fc" id="L248">        response.setPayAmount(payRecord.getPayAmount());</span>
+<span class="fc" id="L249">        response.setPayType(payRecord.getPayMethod());</span>
+
+<span class="fc" id="L251">        PayTypeEnum payTypeEnum = PayTypeEnum.getByCode(payRecord.getPayMethod());</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        response.setPayTypeDesc(payTypeEnum != null ? payTypeEnum.getDesc() : &quot;未知&quot;);</span>
+
+        // 计算支付过期时间
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (order.getCreateTime() != null) {</span>
+<span class="fc" id="L256">            response.setExpireTime(order.getCreateTime().plusMinutes(ORDER_TIMEOUT_MINUTES));</span>
+        }
+
+        // 模拟支付参数
+<span class="fc" id="L260">        PayCreateResponse.PayParams payParams = new PayCreateResponse.PayParams();</span>
+<span class="fc" id="L261">        payParams.setPayUrl(&quot;/api/pay/mock/&quot; + payRecord.getPayNo());</span>
+<span class="fc" id="L262">        payParams.setQrCode(&quot;https://mock.seckill.com/pay/qr/&quot; + payRecord.getPayNo());</span>
+<span class="fc" id="L263">        response.setPayParams(payParams);</span>
+
+<span class="fc" id="L265">        return response;</span>
+    }
+
+    /**
+     * 构建支付状态响应
+     */
+    private PayStatusResponse buildPayStatusResponse(PayRecord payRecord) {
+<span class="fc" id="L272">        PayStatusResponse response = new PayStatusResponse();</span>
+<span class="fc" id="L273">        response.setOrderNo(payRecord.getOrderNo());</span>
+<span class="fc" id="L274">        response.setPayNo(payRecord.getPayNo());</span>
+<span class="fc" id="L275">        response.setPayAmount(payRecord.getPayAmount());</span>
+<span class="fc" id="L276">        response.setPayType(payRecord.getPayMethod());</span>
+
+<span class="fc" id="L278">        PayTypeEnum payTypeEnum = PayTypeEnum.getByCode(payRecord.getPayMethod());</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        response.setPayTypeDesc(payTypeEnum != null ? payTypeEnum.getDesc() : &quot;未知&quot;);</span>
+
+<span class="fc" id="L281">        response.setTradeNo(payRecord.getTradeNo());</span>
+<span class="fc" id="L282">        response.setStatus(payRecord.getStatus());</span>
+
+<span class="fc" id="L284">        PayStatusEnum statusEnum = PayStatusEnum.getByCode(payRecord.getStatus());</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        response.setStatusDesc(statusEnum != null ? statusEnum.getDesc() : &quot;未知&quot;);</span>
+
+<span class="fc" id="L287">        response.setPayTime(payRecord.getPayTime());</span>
+
+<span class="fc" id="L289">        return response;</span>
+    }
+
+    /**
+     * 发送支付成功消息
+     */
+    private void sendPaySuccessMessage(String orderNo, String payNo) {
+        try {
+<span class="fc" id="L297">            rabbitOperations.convertAndSend(</span>
+                    RabbitMQConfig.ORDER_EXCHANGE,
+                    RabbitMQConfig.ORDER_PAY_SUCCESS_ROUTING_KEY,
+                    new PaySuccessMessage(orderNo, payNo)
+            );
+<span class="fc" id="L302">            log.info(&quot;支付成功消息发送成功, orderNo={}, payNo={}&quot;, orderNo, payNo);</span>
+<span class="nc" id="L303">        } catch (Exception e) {</span>
+<span class="nc" id="L304">            log.error(&quot;支付成功消息发送失败, orderNo={}, payNo={}&quot;, orderNo, payNo, e);</span>
+            // 不影响主流程
+<span class="fc" id="L306">        }</span>
+<span class="fc" id="L307">    }</span>
+
+    /**
+     * 更新支付状态缓存
+     */
+    private void updatePayStatusCache(String orderNo, Integer status) {
+        try {
+<span class="fc" id="L314">            String cacheKey = PAY_STATUS_CACHE_PREFIX + orderNo;</span>
+<span class="fc" id="L315">            redisOperations.set(</span>
+                    cacheKey,
+<span class="fc" id="L317">                    String.valueOf(status),</span>
+                    PAY_STATUS_CACHE_MINUTES,
+                    TimeUnit.MINUTES
+            );
+<span class="nc" id="L321">        } catch (Exception e) {</span>
+<span class="nc" id="L322">            log.error(&quot;更新支付状态缓存失败, orderNo={}&quot;, orderNo, e);</span>
+            // 不影响主流程
+<span class="fc" id="L324">        }</span>
+<span class="fc" id="L325">    }</span>
+
+    /**
+     * 支付成功消息内部类
+     */
+<span class="fc" id="L330">    private record PaySuccessMessage(String orderNo, String payNo) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RateLimitService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-seckill</a> &gt; <a href="index.source.html" class="el_package">com.seckill.seckill.service</a> &gt; <span class="el_source">RateLimitService.java</span></div><h1>RateLimitService.java</h1><pre class="source lang-java linenums">package com.seckill.seckill.service;
+
+import com.seckill.common.enums.ResponseCodeEnum;
+import com.seckill.common.exception.BusinessException;
+import com.seckill.infrastructure.utils.RedisOperations;
+import com.seckill.seckill.annotation.RateLimitScene;
+import com.seckill.seckill.config.SeckillProperties;
+import com.seckill.seckill.support.SeckillRedisKeys;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.stereotype.Service;
+
+import java.util.Collections;
+
+@Service
+public class RateLimitService {
+
+    private final RedisOperations redisOperations;
+    private final SeckillProperties seckillProperties;
+
+<span class="fc" id="L22">    private static final DefaultRedisScript&lt;Long&gt; RATE_LIMIT_SCRIPT = createScript();</span>
+
+    @Autowired
+<span class="fc" id="L25">    public RateLimitService(RedisOperations redisOperations, SeckillProperties seckillProperties) {</span>
+<span class="fc" id="L26">        this.redisOperations = redisOperations;</span>
+<span class="fc" id="L27">        this.seckillProperties = seckillProperties;</span>
+<span class="fc" id="L28">    }</span>
+
+    public void check(RateLimitScene scene, Long userId, String uri) {
+<span class="fc" id="L31">        long epochSecond = System.currentTimeMillis() / 1000;</span>
+<span class="pc bpc" id="L32" title="1 of 3 branches missed.">        switch (scene) {</span>
+<span class="fc" id="L33">            case SECKILL_PATH -&gt; checkUserLimit(uri, userId, epochSecond, seckillProperties.getRateLimitPerUser(), ResponseCodeEnum.RATE_LIMIT);</span>
+            case SECKILL_EXECUTE -&gt; {
+<span class="fc" id="L35">                checkGlobalLimit(uri, epochSecond, seckillProperties.getRateLimitGlobal(), ResponseCodeEnum.SECKILL_RATE_LIMIT);</span>
+<span class="fc" id="L36">                checkUserLimit(uri, userId, epochSecond, seckillProperties.getRateLimitPerUser(), ResponseCodeEnum.SECKILL_RATE_LIMIT);</span>
+<span class="fc" id="L37">            }</span>
+            default -&gt; {
+            }
+        }
+<span class="fc" id="L41">    }</span>
+
+    private void checkUserLimit(String uri, Long userId, long epochSecond, int limit, ResponseCodeEnum responseCode) {
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (userId == null) {</span>
+<span class="fc" id="L45">            throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, &quot;请先登录&quot;);</span>
+        }
+<span class="fc" id="L47">        String key = SeckillRedisKeys.userRateLimit(uri, userId, epochSecond);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (!tryAcquire(key, limit)) {</span>
+<span class="fc" id="L49">            throw new BusinessException(responseCode);</span>
+        }
+<span class="fc" id="L51">    }</span>
+
+    private void checkGlobalLimit(String uri, long epochSecond, int limit, ResponseCodeEnum responseCode) {
+<span class="fc" id="L54">        String key = SeckillRedisKeys.globalRateLimit(uri, epochSecond);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (!tryAcquire(key, limit)) {</span>
+<span class="nc" id="L56">            throw new BusinessException(responseCode);</span>
+        }
+<span class="fc" id="L58">    }</span>
+
+    private boolean tryAcquire(String key, int limit) {
+<span class="fc" id="L61">        Long result = redisOperations.execute(RATE_LIMIT_SCRIPT, Collections.singletonList(key), String.valueOf(limit), &quot;1&quot;);</span>
+<span class="pc bpc" id="L62" title="1 of 4 branches missed.">        return result != null &amp;&amp; result == 1L;</span>
+    }
+
+    private static DefaultRedisScript&lt;Long&gt; createScript() {
+<span class="fc" id="L66">        DefaultRedisScript&lt;Long&gt; script = new DefaultRedisScript&lt;&gt;();</span>
+<span class="fc" id="L67">        script.setLocation(new ClassPathResource(&quot;lua/rate_limit.lua&quot;));</span>
+<span class="fc" id="L68">        script.setResultType(Long.class);</span>
+<span class="fc" id="L69">        return script;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

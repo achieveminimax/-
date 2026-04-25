@@ -306,16 +306,218 @@ class UserServiceUnitTest {
     @Test
     @DisplayName("刷新 Token 失败 - Token 类型错误")
     void refreshToken_TypeError() {
-        // Given
         String token = JwtUtils.generateAccessToken(1L);
         TokenRefreshRequest request = TestDataFactory.createTokenRefreshRequest(token);
 
-        // When & Then
-        BusinessException exception = assertThrows(BusinessException.class, () -> {
-            userService.refreshToken(request);
-        });
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> userService.refreshToken(request));
 
         assertEquals(ResponseCodeEnum.UNAUTHORIZED.getCode(), exception.getCode());
         assertTrue(exception.getMessage().contains("类型错误"));
+    }
+
+    // ==================== 补充测试 ====================
+
+    @Test
+    @DisplayName("注册成功 - 用户名和手机号均可用")
+    void register_Success() {
+        UserRegisterRequest request = TestDataFactory.createUserRegisterRequest();
+
+        when(userMapper.countByUsername(request.getUsername())).thenReturn(0);
+        when(userMapper.countByPhone(request.getPhone())).thenReturn(0);
+        when(passwordEncoder.encode(request.getPassword())).thenReturn("encoded_password");
+
+        var response = userService.register(request);
+
+        assertNotNull(response);
+        assertEquals(request.getUsername(), response.getUsername());
+        assertNotNull(response.getToken());
+        assertNotNull(response.getRefreshToken());
+        verify(userMapper).insert(any(User.class));
+    }
+
+    @Test
+    @DisplayName("登录成功 - 手机号登录")
+    void login_Success_WithPhone() {
+        UserLoginRequest request = TestDataFactory.createUserLoginRequestWithPhone();
+        User user = TestDataFactory.createUser();
+
+        when(userMapper.selectByPhone(request.getAccount())).thenReturn(user);
+        when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
+
+        UserLoginResponse response = userService.login(request);
+
+        assertNotNull(response);
+        assertEquals(user.getId(), response.getUserId());
+        verify(userMapper).selectByPhone(request.getAccount());
+    }
+
+    @Test
+    @DisplayName("登录失败 - 账号被锁定")
+    void login_AccountLocked() {
+        UserLoginRequest request = TestDataFactory.createUserLoginRequest();
+        User user = TestDataFactory.createUser();
+
+        when(userMapper.selectByUsername(request.getAccount())).thenReturn(user);
+        when(redisUtils.hasKey("user:lock:" + user.getId())).thenReturn(true);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> userService.login(request));
+
+        assertEquals(ResponseCodeEnum.FORBIDDEN.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("锁定"));
+    }
+
+    @Test
+    @DisplayName("登录失败 - 密码错误，记录失败次数")
+    void login_WrongPassword_RecordFailCount() {
+        UserLoginRequest request = TestDataFactory.createUserLoginRequest();
+        User user = TestDataFactory.createUser();
+
+        when(userMapper.selectByUsername(request.getAccount())).thenReturn(user);
+        when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(false);
+        when(redisUtils.increment(anyString(), anyLong())).thenReturn(1L);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> userService.login(request));
+
+        assertEquals(ResponseCodeEnum.BAD_REQUEST.getCode(), exception.getCode());
+        verify(redisUtils).increment("login:fail:" + user.getId(), 1);
+    }
+
+    @Test
+    @DisplayName("登录失败 - 连续失败5次后锁定账号")
+    void login_FailFiveTimes_AccountLocked() {
+        UserLoginRequest request = TestDataFactory.createUserLoginRequest();
+        User user = TestDataFactory.createUser();
+
+        when(userMapper.selectByUsername(request.getAccount())).thenReturn(user);
+        when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(false);
+        when(redisUtils.increment(anyString(), anyLong())).thenReturn(5L);
+
+        assertThrows(BusinessException.class, () -> userService.login(request));
+
+        verify(redisUtils).set(eq("user:lock:" + user.getId()), eq("1"), anyLong(), eq(TimeUnit.MINUTES));
+    }
+
+    @Test
+    @DisplayName("登出 - 将 Token 加入黑名单并清除用户 Token")
+    void logout_Success() {
+        Long userId = 1L;
+        String token = JwtUtils.generateAccessToken(userId);
+
+        userService.logout(token, userId);
+
+        verify(redisUtils).set(startsWith("token:blacklist:"), eq("1"), anyLong(), eq(TimeUnit.MILLISECONDS));
+        verify(redisUtils).delete("user:token:" + userId);
+        verify(redisUtils).delete("user:refresh:" + userId);
+    }
+
+    @Test
+    @DisplayName("修改密码成功")
+    void updatePassword_Success() {
+        Long userId = 1L;
+        PasswordUpdateRequest request = TestDataFactory.createPasswordUpdateRequest();
+        User user = TestDataFactory.createUser();
+
+        when(userMapper.selectById(userId)).thenReturn(user);
+        when(passwordEncoder.matches(request.getOldPassword(), user.getPassword())).thenReturn(true);
+        when(passwordEncoder.matches(request.getNewPassword(), user.getPassword())).thenReturn(false);
+        when(passwordEncoder.encode(request.getNewPassword())).thenReturn("new_encoded_password");
+
+        assertDoesNotThrow(() -> userService.updatePassword(userId, request));
+
+        verify(userMapper).updateById(user);
+        verify(redisUtils).delete("user:token:" + userId);
+        verify(redisUtils).delete("user:refresh:" + userId);
+    }
+
+    @Test
+    @DisplayName("修改密码失败 - 新密码与确认密码不一致")
+    void updatePassword_NewPasswordMismatch() {
+        Long userId = 1L;
+        PasswordUpdateRequest request = new PasswordUpdateRequest();
+        request.setOldPassword("OldPass123");
+        request.setNewPassword("NewPass123");
+        request.setConfirmPassword("DifferentPass123");
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> userService.updatePassword(userId, request));
+
+        assertEquals(ResponseCodeEnum.PARAM_ERROR.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("密码不一致"));
+    }
+
+    @Test
+    @DisplayName("修改密码失败 - 用户不存在")
+    void updatePassword_UserNotFound() {
+        Long userId = 999L;
+        PasswordUpdateRequest request = TestDataFactory.createPasswordUpdateRequest();
+
+        when(userMapper.selectById(userId)).thenReturn(null);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> userService.updatePassword(userId, request));
+
+        assertEquals(ResponseCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("更新用户信息失败 - 用户不存在")
+    void updateUserInfo_UserNotFound() {
+        Long userId = 999L;
+        UserUpdateRequest request = TestDataFactory.createUserUpdateRequest();
+
+        when(userMapper.selectById(userId)).thenReturn(null);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> userService.updateUserInfo(userId, request));
+
+        assertEquals(ResponseCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("更新用户信息失败 - 性别参数超出范围")
+    void updateUserInfo_GenderOutOfRange() {
+        Long userId = 1L;
+        UserUpdateRequest request = TestDataFactory.createUserUpdateRequest();
+        request.setGender("5");
+
+        when(userMapper.selectById(userId)).thenReturn(TestDataFactory.createUser());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> userService.updateUserInfo(userId, request));
+
+        assertEquals(ResponseCodeEnum.PARAM_ERROR.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("gender"));
+    }
+
+    @Test
+    @DisplayName("获取用户信息 - 手机号脱敏验证")
+    void getUserInfo_PhoneMasked() {
+        Long userId = 1L;
+        User user = TestDataFactory.createUser();
+        user.setPhone("13800138000");
+
+        when(userMapper.selectById(userId)).thenReturn(user);
+
+        UserInfoResponse response = userService.getUserInfo(userId);
+
+        assertEquals("138****8000", response.getPhone());
+    }
+
+    @Test
+    @DisplayName("注册成功 - 昵称为空时使用用户名")
+    void register_Success_NicknameFallback() {
+        UserRegisterRequest request = TestDataFactory.createUserRegisterRequest();
+        request.setNickname("");
+
+        when(userMapper.countByUsername(request.getUsername())).thenReturn(0);
+        when(userMapper.countByPhone(request.getPhone())).thenReturn(0);
+        when(passwordEncoder.encode(request.getPassword())).thenReturn("encoded_password");
+
+        var response = userService.register(request);
+
+        assertEquals(request.getUsername(), response.getNickname());
     }
 }

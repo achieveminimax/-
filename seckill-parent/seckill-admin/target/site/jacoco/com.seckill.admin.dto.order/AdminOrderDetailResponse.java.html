@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminOrderDetailResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-admin</a> &gt; <a href="index.source.html" class="el_package">com.seckill.admin.dto.order</a> &gt; <span class="el_source">AdminOrderDetailResponse.java</span></div><h1>AdminOrderDetailResponse.java</h1><pre class="source lang-java linenums">package com.seckill.admin.dto.order;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+/**
+ * 管理端订单详情响应。
+ */
+<span class="nc bnc" id="L11" title="All 174 branches missed.">@Data</span>
+public class AdminOrderDetailResponse {
+<span class="nc" id="L13">    private String orderNo;</span>
+<span class="nc" id="L14">    private Long userId;</span>
+<span class="nc" id="L15">    private String username;</span>
+<span class="nc" id="L16">    private Long activityId;</span>
+<span class="nc" id="L17">    private Long goodsId;</span>
+<span class="nc" id="L18">    private String goodsName;</span>
+<span class="nc" id="L19">    private String goodsImg;</span>
+<span class="nc" id="L20">    private BigDecimal totalAmount;</span>
+<span class="nc" id="L21">    private Integer quantity;</span>
+<span class="nc" id="L22">    private Integer status;</span>
+<span class="nc" id="L23">    private String statusDesc;</span>
+<span class="nc" id="L24">    private Integer payType;</span>
+<span class="nc" id="L25">    private LocalDateTime payTime;</span>
+<span class="nc" id="L26">    private String receiverName;</span>
+<span class="nc" id="L27">    private String receiverPhone;</span>
+<span class="nc" id="L28">    private String receiverAddress;</span>
+<span class="nc" id="L29">    private String expressCompany;</span>
+<span class="nc" id="L30">    private String expressNo;</span>
+<span class="nc" id="L31">    private LocalDateTime shipTime;</span>
+<span class="nc" id="L32">    private LocalDateTime createTime;</span>
+<span class="nc" id="L33">    private LocalDateTime updateTime;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

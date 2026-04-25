@@ -66,42 +66,79 @@ public class RedisKeyConstant {
      * key: seckill:seckill:stock:{activityId}:{goodsId}
      * value: 秒杀库存数量
      */
-    public static final String SECKILL_STOCK = PREFIX + "seckill:stock:";
+    public static final String SECKILL_STOCK = PREFIX + "stock:";
 
     /**
      * 秒杀商品已售数量前缀
      * key: seckill:seckill:sold:{activityId}:{goodsId}
      * value: 已售数量
      */
-    public static final String SECKILL_SOLD = PREFIX + "seckill:sold:";
+    public static final String SECKILL_SOLD = PREFIX + "sold:";
 
     /**
      * 用户秒杀记录前缀（用于防重复秒杀）
      * key: seckill:seckill:record:{activityId}:{goodsId}:{userId}
      * value: 订单ID
      */
-    public static final String SECKILL_RECORD = PREFIX + "seckill:record:";
+    public static final String SECKILL_RECORD = PREFIX + "record:";
 
     /**
      * 秒杀地址前缀（用于隐藏真实秒杀地址）
      * key: seckill:seckill:path:{userId}:{goodsId}
      * value: 加密后的秒杀路径
      */
-    public static final String SECKILL_PATH = PREFIX + "seckill:path:";
+    public static final String SECKILL_PATH = PREFIX + "path:";
+
+    /**
+     * 秒杀地址获取次数前缀
+     * key: seckill:path:count:{userId}:{activityId}:{goodsId}
+     * value: 获取次数
+     */
+    public static final String SECKILL_PATH_COUNT = PREFIX + "path:count:";
 
     /**
      * 秒杀验证码前缀
      * key: seckill:seckill:verify:{userId}:{goodsId}
      * value: 验证码
      */
-    public static final String SECKILL_VERIFY = PREFIX + "seckill:verify:";
+    public static final String SECKILL_VERIFY = PREFIX + "verify:";
 
     /**
      * 秒杀限流计数器前缀
      * key: seckill:seckill:limit:{userId}
      * value: 访问次数
      */
-    public static final String SECKILL_LIMIT = PREFIX + "seckill:limit:";
+    public static final String SECKILL_LIMIT = PREFIX + "limit:";
+
+    /**
+     * 已参与秒杀用户集合前缀
+     * key: seckill:done:{activityId}:{goodsId}
+     * value: 用户ID Set
+     */
+    public static final String SECKILL_DONE = PREFIX + "done:";
+
+    /**
+     * 秒杀结果缓存前缀
+     * key: seckill:result:{recordId}
+     * value: 秒杀结果对象
+     */
+    public static final String SECKILL_RESULT = PREFIX + "result:";
+
+    // ==================== 支付相关 ====================
+
+    /**
+     * 支付状态缓存前缀
+     * key: seckill:pay:status:{orderNo}
+     * value: 支付状态对象
+     */
+    public static final String PAY_STATUS = PREFIX + "pay:status:";
+
+    /**
+     * 支付回调锁前缀
+     * key: seckill:pay:callback:lock:{orderNo}
+     * value: requestId
+     */
+    public static final String PAY_CALLBACK_LOCK = PREFIX + "pay:callback:lock:";
 
     // ==================== 订单相关 ====================
 

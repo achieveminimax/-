@@ -1,38 +1,45 @@
 import { useState } from 'react';
 import { Form, Input, Button, Checkbox, Toast } from 'antd-mobile';
 import { EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useUserStore } from '../../store';
+import { userApi } from '../../api';
 import './index.css';
 
 export function Login() {
   const navigate = useNavigate();
-  const { setUser } = useUserStore();
+  const location = useLocation();
+  const { login } = useUserStore();
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const onFinish = async (values: { username: string; password: string; remember?: boolean }) => {
     setLoading(true);
-    
-    // 模拟登录请求
-    setTimeout(() => {
-      setLoading(false);
-      
-      // 模拟登录成功
-      setUser({
-        id: 1,
+
+    try {
+      const data = await userApi.login({
         username: values.username,
-        phone: '13800138000',
-        token: 'mock_token_' + Date.now(),
+        password: values.password,
       });
-      
+
+      login(data.token, data.refreshToken, data.userInfo);
+
       Toast.show({
         icon: 'success',
         content: '登录成功',
       });
-      
-      navigate('/');
-    }, 1000);
+
+      const from = (location.state as { from?: string })?.from || '/';
+      navigate(from, { replace: true });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '登录失败，请重试';
+      Toast.show({
+        icon: 'fail',
+        content: message,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

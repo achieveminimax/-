@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminAuthorizationInterceptor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-admin</a> &gt; <a href="index.source.html" class="el_package">com.seckill.admin.interceptor</a> &gt; <span class="el_source">AdminAuthorizationInterceptor.java</span></div><h1>AdminAuthorizationInterceptor.java</h1><pre class="source lang-java linenums">package com.seckill.admin.interceptor;
+
+import com.seckill.admin.annotation.RequireAdmin;
+import com.seckill.admin.enums.AdminRoleEnum;
+import com.seckill.common.enums.ResponseCodeEnum;
+import com.seckill.common.exception.BusinessException;
+import com.seckill.common.utils.AdminContext;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.stereotype.Component;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.Set;
+
+/**
+ * 管理端角色授权拦截器。
+ */
+@Component
+<span class="fc" id="L23">public class AdminAuthorizationInterceptor implements HandlerInterceptor {</span>
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (!(handler instanceof HandlerMethod handlerMethod)) {</span>
+<span class="fc" id="L28">            return true;</span>
+        }
+
+<span class="fc" id="L31">        RequireAdmin requireAdmin = resolveAnnotation(handlerMethod);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (requireAdmin == null) {</span>
+<span class="fc" id="L33">            requireAdmin = defaultRequireAdmin();</span>
+        }
+
+<span class="fc" id="L36">        AdminRoleEnum currentRole = AdminRoleEnum.fromCode(AdminContext.getCurrentRole());</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (currentRole == null) {</span>
+<span class="fc" id="L38">            throw new BusinessException(ResponseCodeEnum.FORBIDDEN, &quot;管理员角色无效&quot;);</span>
+        }
+
+<span class="fc" id="L41">        Set&lt;AdminRoleEnum&gt; allowedRoles = EnumSet.copyOf(Arrays.asList(requireAdmin.roles()));</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (!allowedRoles.contains(currentRole)) {</span>
+<span class="fc" id="L43">            throw new BusinessException(ResponseCodeEnum.FORBIDDEN, &quot;当前角色无权访问该管理接口&quot;);</span>
+        }
+<span class="fc" id="L45">        return true;</span>
+    }
+
+    private RequireAdmin resolveAnnotation(HandlerMethod handlerMethod) {
+<span class="fc" id="L49">        RequireAdmin methodAnnotation = AnnotatedElementUtils.findMergedAnnotation(handlerMethod.getMethod(), RequireAdmin.class);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (methodAnnotation != null) {</span>
+<span class="fc" id="L51">            return methodAnnotation;</span>
+        }
+<span class="fc" id="L53">        return AnnotatedElementUtils.findMergedAnnotation(handlerMethod.getBeanType(), RequireAdmin.class);</span>
+    }
+
+    private RequireAdmin defaultRequireAdmin() {
+<span class="fc" id="L57">        return new RequireAdmin() {</span>
+            @Override
+            public Class&lt;RequireAdmin&gt; annotationType() {
+<span class="nc" id="L60">                return RequireAdmin.class;</span>
+            }
+
+            @Override
+            public AdminRoleEnum[] roles() {
+<span class="fc" id="L65">                return new AdminRoleEnum[]{AdminRoleEnum.SUPER_ADMIN};</span>
+            }
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

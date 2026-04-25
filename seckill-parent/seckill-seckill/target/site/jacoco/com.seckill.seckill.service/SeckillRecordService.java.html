@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SeckillRecordService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-seckill</a> &gt; <a href="index.source.html" class="el_package">com.seckill.seckill.service</a> &gt; <span class="el_source">SeckillRecordService.java</span></div><h1>SeckillRecordService.java</h1><pre class="source lang-java linenums">package com.seckill.seckill.service;
+
+import com.seckill.common.enums.SeckillRecordStatusEnum;
+import com.seckill.common.enums.ResponseCodeEnum;
+import com.seckill.common.exception.BusinessException;
+import com.seckill.goods.entity.Goods;
+import com.seckill.goods.entity.SeckillGoods;
+import com.seckill.infrastructure.utils.RedisUtils;
+import com.seckill.order.entity.Order;
+import com.seckill.order.mapper.OrderMapper;
+import com.seckill.seckill.config.SeckillProperties;
+import com.seckill.seckill.dto.SeckillResultResponse;
+import com.seckill.seckill.entity.SeckillRecord;
+import com.seckill.seckill.mapper.SeckillRecordMapper;
+import com.seckill.seckill.support.SeckillRedisKeys;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+
+@Service
+<span class="fc" id="L23">@RequiredArgsConstructor</span>
+public class SeckillRecordService {
+
+    private final SeckillRecordMapper seckillRecordMapper;
+    private final OrderMapper orderMapper;
+    private final RedisUtils redisUtils;
+    private final SeckillProperties seckillProperties;
+
+    @Transactional(rollbackFor = Exception.class)
+    public SeckillRecord createQueuedRecord(Long userId, Long activityId, Long goodsId) {
+<span class="fc" id="L33">        SeckillRecord record = new SeckillRecord();</span>
+<span class="fc" id="L34">        record.setUserId(userId);</span>
+<span class="fc" id="L35">        record.setActivityId(activityId);</span>
+<span class="fc" id="L36">        record.setGoodsId(goodsId);</span>
+<span class="fc" id="L37">        record.setStatus(SeckillRecordStatusEnum.QUEUING.getCode());</span>
+<span class="fc" id="L38">        seckillRecordMapper.insert(record);</span>
+<span class="fc" id="L39">        return record;</span>
+    }
+
+    public void cacheQueuingResult(SeckillRecord record, Goods goods, SeckillGoods seckillGoods) {
+<span class="nc" id="L43">        SeckillResultResponse response = buildBaseResponse(record, goods, seckillGoods);</span>
+<span class="nc" id="L44">        response.setStatusDesc(SeckillRecordStatusEnum.QUEUING.getDesc());</span>
+<span class="nc" id="L45">        cacheResult(response);</span>
+<span class="nc" id="L46">    }</span>
+
+    @Transactional(rollbackFor = Exception.class)
+    public void markSuccess(Long recordId, Long orderId, String orderNo, Goods goods, SeckillGoods seckillGoods) {
+<span class="fc" id="L50">        SeckillRecord record = seckillRecordMapper.selectById(recordId);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (record == null) {</span>
+<span class="nc" id="L52">            return;</span>
+        }
+<span class="fc" id="L54">        record.setOrderId(orderId);</span>
+<span class="fc" id="L55">        record.setStatus(SeckillRecordStatusEnum.SUCCESS.getCode());</span>
+<span class="fc" id="L56">        record.setFinishTime(LocalDateTime.now());</span>
+<span class="fc" id="L57">        seckillRecordMapper.updateById(record);</span>
+
+<span class="fc" id="L59">        SeckillResultResponse response = buildBaseResponse(record, goods, seckillGoods);</span>
+<span class="fc" id="L60">        response.setStatusDesc(SeckillRecordStatusEnum.SUCCESS.getDesc());</span>
+<span class="fc" id="L61">        response.setOrderNo(orderNo);</span>
+<span class="fc" id="L62">        response.setFinishTime(record.getFinishTime());</span>
+<span class="fc" id="L63">        cacheResult(response);</span>
+<span class="fc" id="L64">    }</span>
+
+    @Transactional(rollbackFor = Exception.class)
+    public void markFailed(Long recordId, String failReason, Goods goods, SeckillGoods seckillGoods) {
+<span class="fc" id="L68">        SeckillRecord record = seckillRecordMapper.selectById(recordId);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (record == null) {</span>
+<span class="nc" id="L70">            return;</span>
+        }
+<span class="fc" id="L72">        record.setStatus(SeckillRecordStatusEnum.FAILED.getCode());</span>
+<span class="fc" id="L73">        record.setFailReason(failReason);</span>
+<span class="fc" id="L74">        record.setFinishTime(LocalDateTime.now());</span>
+<span class="fc" id="L75">        seckillRecordMapper.updateById(record);</span>
+
+<span class="fc" id="L77">        SeckillResultResponse response = buildBaseResponse(record, goods, seckillGoods);</span>
+<span class="fc" id="L78">        response.setStatusDesc(SeckillRecordStatusEnum.FAILED.getDesc());</span>
+<span class="fc" id="L79">        response.setFailReason(failReason);</span>
+<span class="fc" id="L80">        response.setFinishTime(record.getFinishTime());</span>
+<span class="fc" id="L81">        cacheResult(response);</span>
+<span class="fc" id="L82">    }</span>
+
+    public SeckillResultResponse getResult(Long userId, Long recordId, Goods goods, SeckillGoods seckillGoods) {
+<span class="fc" id="L85">        SeckillResultResponse cached = redisUtils.get(SeckillRedisKeys.result(recordId));</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (cached != null) {</span>
+<span class="fc" id="L87">            return cached;</span>
+        }
+
+<span class="fc" id="L90">        SeckillRecord record = seckillRecordMapper.selectById(recordId);</span>
+<span class="fc bfc" id="L91" title="All 4 branches covered.">        if (record == null || !record.getUserId().equals(userId)) {</span>
+<span class="fc" id="L92">            throw new BusinessException(ResponseCodeEnum.NOT_FOUND, &quot;秒杀记录不存在&quot;);</span>
+        }
+
+<span class="fc" id="L95">        SeckillResultResponse response = buildBaseResponse(record, goods, seckillGoods);</span>
+<span class="fc" id="L96">        response.setFinishTime(record.getFinishTime());</span>
+<span class="fc" id="L97">        response.setFailReason(record.getFailReason());</span>
+<span class="fc" id="L98">        SeckillRecordStatusEnum statusEnum = SeckillRecordStatusEnum.getByCode(record.getStatus());</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        response.setStatusDesc(statusEnum == null ? &quot;未知&quot; : statusEnum.getDesc());</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (record.getOrderId() != null) {</span>
+<span class="fc" id="L101">            Order order = orderMapper.selectById(record.getOrderId());</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (order != null) {</span>
+<span class="fc" id="L103">                response.setOrderNo(order.getOrderNo());</span>
+            }
+        }
+<span class="fc" id="L106">        cacheResult(response);</span>
+<span class="fc" id="L107">        return response;</span>
+    }
+
+    private SeckillResultResponse buildBaseResponse(SeckillRecord record, Goods goods, SeckillGoods seckillGoods) {
+<span class="fc" id="L111">        SeckillResultResponse response = new SeckillResultResponse();</span>
+<span class="fc" id="L112">        response.setRecordId(record.getId());</span>
+<span class="fc" id="L113">        response.setActivityId(record.getActivityId());</span>
+<span class="fc" id="L114">        response.setGoodsId(record.getGoodsId());</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        response.setGoodsName(goods == null ? null : goods.getName());</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        response.setSeckillPrice(seckillGoods == null ? null : seckillGoods.getSeckillPrice());</span>
+<span class="fc" id="L117">        response.setStatus(record.getStatus());</span>
+<span class="fc" id="L118">        response.setCreateTime(record.getCreateTime());</span>
+<span class="fc" id="L119">        return response;</span>
+    }
+
+    private void cacheResult(SeckillResultResponse response) {
+<span class="fc" id="L123">        redisUtils.set(SeckillRedisKeys.result(response.getRecordId()), response, seckillProperties.getResultTtlSeconds(), java.util.concurrent.TimeUnit.SECONDS);</span>
+<span class="fc" id="L124">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -44,7 +44,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/api/user/register",
                         "/api/user/login",
-                        "/api/user/refresh-token"
+                        "/api/user/refresh-token",
+                        "/api/admin/login",
+                        "/api/category/list",
+                        "/api/goods/list",
+                        "/api/goods/*",
+                        "/api/seckill/list"
                 );
 
         log.info("JWT 认证拦截器注册完成");

@@ -1,0 +1,7 @@
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-order/src/test/java/com/seckill/order/mq/OrderPaySuccessConsumerUnitTest.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-order/src/test/java/com/seckill/order/mq/OrderTimeoutConsumerUnitTest.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-order/src/test/java/com/seckill/order/service/OrderAdminServiceImplUnitTest.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-order/src/test/java/com/seckill/order/service/OrderCreateServiceUnitTest.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-order/src/test/java/com/seckill/order/service/OrderServiceUnitTest.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-order/src/test/java/com/seckill/order/service/PayServiceUnitTest.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-order/src/test/java/com/seckill/order/service/StockRollbackServiceUnitTest.java

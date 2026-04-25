@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminUserController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-admin</a> &gt; <a href="index.source.html" class="el_package">com.seckill.admin.controller</a> &gt; <span class="el_source">AdminUserController.java</span></div><h1>AdminUserController.java</h1><pre class="source lang-java linenums">package com.seckill.admin.controller;
+
+import com.seckill.admin.annotation.RequireAdmin;
+import com.seckill.admin.dto.user.AdminUserDetailResponse;
+import com.seckill.admin.dto.user.AdminUserListResponse;
+import com.seckill.admin.dto.user.AdminUserStatusUpdateRequest;
+import com.seckill.admin.enums.AdminRoleEnum;
+import com.seckill.admin.mapper.AdminUserQueryMapper;
+import com.seckill.common.result.PageResult;
+import com.seckill.common.result.Result;
+import com.seckill.common.utils.AdminContext;
+import com.seckill.user.service.UserAdminService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * 管理端用户管理入口。
+ * &lt;p&gt;
+ * 提供用户列表查询、详情查看、禁用/启用等后台管理功能。
+ */
+@RestController
+@RequestMapping(&quot;/api/admin/user&quot;)
+<span class="nc" id="L32">@RequiredArgsConstructor</span>
+public class AdminUserController {
+
+    /**
+     * 管理端用户查询 Mapper。
+     */
+    private final AdminUserQueryMapper adminUserQueryMapper;
+
+    /**
+     * 管理端用户服务。
+     */
+    private final UserAdminService userAdminService;
+
+    /**
+     * 查询用户列表。
+     *
+     * @param keyword 搜索关键词（用户名/昵称/手机号）
+     * @param status  用户状态：0-禁用、1-正常
+     * @param current 当前页码
+     * @param size    每页大小
+     * @return 分页用户列表
+     */
+    @GetMapping(&quot;/list&quot;)
+    @RequireAdmin(roles = {AdminRoleEnum.SUPER_ADMIN, AdminRoleEnum.ADMIN, AdminRoleEnum.OPERATOR})
+    public Result&lt;PageResult&lt;AdminUserListResponse&gt;&gt; list(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false, defaultValue = &quot;1&quot;) Long current,
+            @RequestParam(required = false, defaultValue = &quot;10&quot;) Long size) {
+
+<span class="nc" id="L62">        long offset = (current - 1) * size;</span>
+<span class="nc" id="L63">        long total = adminUserQueryMapper.count(keyword, status);</span>
+<span class="nc" id="L64">        List&lt;AdminUserListResponse&gt; records = adminUserQueryMapper.selectPage(keyword, status, offset, size);</span>
+
+<span class="nc" id="L66">        PageResult&lt;AdminUserListResponse&gt; result = new PageResult&lt;&gt;();</span>
+<span class="nc" id="L67">        result.setRecords(records);</span>
+<span class="nc" id="L68">        result.setTotal(total);</span>
+<span class="nc" id="L69">        result.setSize(size);</span>
+<span class="nc" id="L70">        result.setCurrent(current);</span>
+<span class="nc" id="L71">        result.setPages((total + size - 1) / size);</span>
+
+<span class="nc" id="L73">        return Result.success(result);</span>
+    }
+
+    /**
+     * 查询用户详情。
+     *
+     * @param userId 用户 ID
+     * @return 用户详情
+     */
+    @GetMapping(&quot;/{userId}&quot;)
+    @RequireAdmin(roles = {AdminRoleEnum.SUPER_ADMIN, AdminRoleEnum.ADMIN, AdminRoleEnum.OPERATOR})
+    public Result&lt;AdminUserDetailResponse&gt; detail(@PathVariable Long userId) {
+<span class="nc" id="L85">        AdminUserDetailResponse detail = adminUserQueryMapper.selectDetail(userId);</span>
+<span class="nc" id="L86">        return Result.success(detail);</span>
+    }
+
+    /**
+     * 更新用户状态（禁用/启用）。
+     *
+     * @param userId  用户 ID
+     * @param request 状态更新请求
+     * @return 操作结果
+     */
+    @PutMapping(&quot;/status/{userId}&quot;)
+    @RequireAdmin(roles = {AdminRoleEnum.SUPER_ADMIN, AdminRoleEnum.ADMIN})
+    public Result&lt;Void&gt; updateStatus(@PathVariable Long userId,
+                                     @Valid @RequestBody AdminUserStatusUpdateRequest request) {
+        // 禁止操作自己
+<span class="nc" id="L101">        Long currentAdminId = AdminContext.getCurrentAdminId();</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (userId.equals(currentAdminId)) {</span>
+<span class="nc" id="L103">            return Result.error(403, &quot;不能操作自己的账号&quot;);</span>
+        }
+
+<span class="nc" id="L106">        userAdminService.updateUserStatus(userId, request.getStatus());</span>
+<span class="nc" id="L107">        return Result.success();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

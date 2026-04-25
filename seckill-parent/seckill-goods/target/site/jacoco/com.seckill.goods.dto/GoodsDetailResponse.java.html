@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GoodsDetailResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-goods</a> &gt; <a href="index.source.html" class="el_package">com.seckill.goods.dto</a> &gt; <span class="el_source">GoodsDetailResponse.java</span></div><h1>GoodsDetailResponse.java</h1><pre class="source lang-java linenums">package com.seckill.goods.dto;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * 前台商品详情响应体。
+ * &lt;p&gt;
+ * 除普通商品信息外，还会附带最近可参与的秒杀活动信息。
+ */
+<span class="pc bnc" id="L14" title="All 158 branches missed.">@Data</span>
+public class GoodsDetailResponse {
+    /** 商品 ID。 */
+<span class="fc" id="L17">    private Long goodsId;</span>
+    /** 商品名称。 */
+<span class="nc" id="L19">    private String goodsName;</span>
+    /** 商品主图。 */
+<span class="nc" id="L21">    private String goodsImg;</span>
+    /** 商品多图。 */
+<span class="nc" id="L23">    private List&lt;String&gt; goodsImages;</span>
+    /** 分类 ID。 */
+<span class="nc" id="L25">    private Long categoryId;</span>
+    /** 分类名称。 */
+<span class="nc" id="L27">    private String categoryName;</span>
+    /** 商品简介。 */
+<span class="nc" id="L29">    private String description;</span>
+    /** 商品详情富文本。 */
+<span class="nc" id="L31">    private String detail;</span>
+    /** 商品原价。 */
+<span class="nc" id="L33">    private BigDecimal price;</span>
+    /** 秒杀价。 */
+<span class="fc" id="L35">    private BigDecimal seckillPrice;</span>
+    /** 普通库存。 */
+<span class="nc" id="L37">    private Integer stock;</span>
+    /** 销量。 */
+<span class="nc" id="L39">    private Integer sales;</span>
+    /** 商品状态。 */
+<span class="nc" id="L41">    private Integer status;</span>
+    /** 是否关联秒杀活动。 */
+<span class="fc" id="L43">    private Integer isSeckill;</span>
+    /** 秒杀活动 ID。 */
+<span class="nc" id="L45">    private Long seckillActivityId;</span>
+    /** 秒杀开始时间。 */
+<span class="nc" id="L47">    private LocalDateTime seckillStartTime;</span>
+    /** 秒杀结束时间。 */
+<span class="nc" id="L49">    private LocalDateTime seckillEndTime;</span>
+    /** 创建时间。 */
+<span class="nc" id="L51">    private LocalDateTime createTime;</span>
+    /** 更新时间。 */
+<span class="nc" id="L53">    private LocalDateTime updateTime;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -2,6 +2,7 @@ package com.seckill.infrastructure.interceptor;
 
 import com.seckill.common.enums.ResponseCodeEnum;
 import com.seckill.common.exception.BusinessException;
+import com.seckill.common.utils.AdminContext;
 import com.seckill.common.utils.JwtUtils;
 import com.seckill.common.utils.UserContext;
 import com.seckill.infrastructure.utils.RedisUtils;
@@ -24,12 +25,19 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
 
     // Token 黑名单 Key 前缀
     private static final String TOKEN_BLACKLIST_KEY = "token:blacklist:";
+    private static final String USER_TOKEN_KEY = "user:token:";
+    private static final String ADMIN_TOKEN_KEY = "admin:token:";
+    private static final String ADMIN_PATH_PREFIX = "/api/admin/";
 
     // 白名单路径
     private static final String[] WHITE_LIST = {
             "/api/user/register",
             "/api/user/login",
             "/api/user/refresh-token",
+            "/api/admin/login",
+            "/api/category/list",
+            "/api/goods/list",
+            "/api/seckill/list",
             "/doc.html",
             "/swagger-ui",
             "/v3/api-docs",
@@ -63,19 +71,46 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, "Token 无效或已过期");
         }
 
+        if (!JwtUtils.isAccessToken(token)) {
+            throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, "当前接口仅支持访问 Token");
+        }
+
         // 检查 Token 是否在黑名单中（用户已登出）
-        if (redisUtils.hasKey(TOKEN_BLACKLIST_KEY + token)) {
+        if (Boolean.TRUE.equals(redisUtils.hasKey(TOKEN_BLACKLIST_KEY + token))) {
             log.warn("Token 已被加入黑名单: {}", requestUri);
             throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, "Token 已失效，请重新登录");
         }
 
-        // 从 Token 中获取用户ID
-        Long userId = JwtUtils.getUserIdFromToken(token);
+        Long principalId = JwtUtils.getUserIdFromToken(token);
+        String subjectType = JwtUtils.getSubjectType(token);
+        String storedToken;
 
-        // 将用户ID存入 ThreadLocal
-        UserContext.setCurrentUserId(userId);
+        if (requestUri.startsWith(ADMIN_PATH_PREFIX)) {
+            if (!"admin".equals(subjectType)) {
+                throw new BusinessException(ResponseCodeEnum.FORBIDDEN, "管理员接口需要管理员身份");
+            }
+            storedToken = redisUtils.get(ADMIN_TOKEN_KEY + principalId);
+            if (storedToken == null || !storedToken.equals(token)) {
+                throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, "管理员登录状态已失效");
+            }
+            AdminContext.setCurrentAdminId(principalId);
+            AdminContext.setCurrentRole(JwtUtils.getRole(token));
+            log.debug("管理员认证通过, adminId: {}, uri: {}", principalId, requestUri);
+            return true;
+        }
 
-        log.debug("JWT 认证通过, userId: {}, uri: {}", userId, requestUri);
+        if (!"user".equals(subjectType)) {
+            throw new BusinessException(ResponseCodeEnum.FORBIDDEN, "当前接口需要用户身份");
+        }
+
+        storedToken = redisUtils.get(USER_TOKEN_KEY + principalId);
+        if (storedToken == null || !storedToken.equals(token)) {
+            throw new BusinessException(ResponseCodeEnum.UNAUTHORIZED, "用户登录状态已失效");
+        }
+
+        UserContext.setCurrentUserId(principalId);
+
+        log.debug("JWT 认证通过, userId: {}, uri: {}", principalId, requestUri);
         return true;
     }
 
@@ -83,6 +118,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
         // 请求结束后清除 ThreadLocal
         UserContext.clear();
+        AdminContext.clear();
     }
 
     /**
@@ -93,6 +129,12 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             if (requestUri.startsWith(whitePath) || requestUri.equals(whitePath)) {
                 return true;
             }
+        }
+        if (requestUri.matches("^/api/goods/\\d+$")) {
+            return true;
+        }
+        if (requestUri.matches("^/api/seckill/\\d+$")) {
+            return true;
         }
         return false;
     }

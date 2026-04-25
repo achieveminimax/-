@@ -65,6 +65,13 @@ public class PageResult<T> implements Serializable {
     }
 
     /**
+     * 构建分页结果（别名方法）
+     */
+    public static <T> PageResult<T> of(List<T> records, Long total, Long current, Long size) {
+        return new PageResult<>(records, total, size, current);
+    }
+
+    /**
      * 构建空分页结果
      */
     public static <T> PageResult<T> empty() {

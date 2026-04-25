@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { SearchBar, Swiper, Grid } from 'antd-mobile';
 import { FireOutlined, ClockCircleOutlined } from '@ant-design/icons';
-import { MobileLayout } from '../../layouts';
 import { SeckillCard, Countdown } from '../../components';
 import { SECKILL_STATUS } from '../../utils/constants';
 import type { SeckillActivity, SeckillGoods } from '../../types';
@@ -95,7 +94,6 @@ export function Home() {
   const navigate = useNavigate();
 
   return (
-    <MobileLayout showTabBar>
       <div className="home-page">
         {/* 搜索栏 */}
         <div className="home-search">
@@ -191,6 +189,5 @@ export function Home() {
           </Grid>
         </div>
       </div>
-    </MobileLayout>
   );
 }

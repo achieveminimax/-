@@ -2,6 +2,7 @@ package com.seckill.user.service;
 
 import com.seckill.user.dto.AddressRequest;
 import com.seckill.user.dto.AddressResponse;
+import com.seckill.user.entity.Address;
 
 import java.util.List;
 
@@ -59,4 +60,13 @@ public interface AddressService {
      * @return 默认地址
      */
     AddressResponse getDefaultAddress(Long userId);
+
+    /**
+     * 获取当前用户的指定地址
+     *
+     * @param userId    用户ID
+     * @param addressId 地址ID
+     * @return 地址实体
+     */
+    Address getAddressById(Long userId, Long addressId);
 }

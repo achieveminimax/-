@@ -10,13 +10,12 @@ import {
   QuestionCircleOutlined,
   FileTextOutlined,
 } from '@ant-design/icons';
-import { MobileLayout } from '../../layouts';
 import { useUserStore } from '../../store';
 import './index.css';
 
 export function Profile() {
   const navigate = useNavigate();
-  const { user, logout } = useUserStore();
+  const { userInfo, logout } = useUserStore();
 
   const orderShortcuts = [
     { key: 'pending', icon: '💰', label: '待支付', count: 2 },
@@ -49,17 +48,16 @@ export function Profile() {
   };
 
   return (
-    <MobileLayout showTabBar>
       <div className="profile-page">
         {/* 用户信息卡片 */}
         <div className="profile-header">
           <div className="user-info" onClick={() => navigate('/settings')}>
-            <Avatar src={user?.avatar} className="user-avatar">
-              {user?.username?.[0] || <UserOutlined />}
+            <Avatar src={userInfo?.avatar} className="user-avatar">
+              {userInfo?.username?.[0] || <UserOutlined />}
             </Avatar>
             <div className="user-detail">
-              <h3 className="username">{user?.username || '未登录'}</h3>
-              <p className="phone">{user?.phone || '点击登录'}</p>
+              <h3 className="username">{userInfo?.username || '未登录'}</h3>
+              <p className="phone">{userInfo?.phone || '点击登录'}</p>
             </div>
             <span className="arrow">&gt;</span>
           </div>
@@ -133,7 +131,7 @@ export function Profile() {
         </div>
 
         {/* 退出登录 */}
-        {user && (
+        {userInfo && (
           <div className="profile-section">
             <div className="logout-btn" onClick={logout}>
               退出登录
@@ -141,6 +139,5 @@ export function Profile() {
           </div>
         )}
       </div>
-    </MobileLayout>
   );
 }

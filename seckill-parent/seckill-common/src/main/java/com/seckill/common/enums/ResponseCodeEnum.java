@@ -38,6 +38,9 @@ public enum ResponseCodeEnum {
     ADDRESS_INCOMPLETE(40014, "收货地址信息不完整"),
     FILE_TYPE_NOT_SUPPORT(40015, "文件上传格式不支持"),
     FILE_SIZE_EXCEED(40016, "文件大小超出限制"),
+    SECKILL_PATH_INVALID(40017, "秒杀地址无效或已过期"),
+    ORDER_ALREADY_PAID(40018, "订单已支付"),
+    STOCK_NOT_PREHEATED(40019, "秒杀库存未预热，请稍后再试"),
 
     // 资源不存在错误（40401-40499）
     USER_NOT_FOUND(40401, "用户不存在"),

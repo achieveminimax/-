@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OrderController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-order</a> &gt; <a href="index.source.html" class="el_package">com.seckill.order.controller</a> &gt; <span class="el_source">OrderController.java</span></div><h1>OrderController.java</h1><pre class="source lang-java linenums">package com.seckill.order.controller;
+
+import com.seckill.common.dto.PageRequest;
+import com.seckill.common.result.PageResult;
+import com.seckill.common.result.Result;
+import com.seckill.order.dto.OrderDetailResponse;
+import com.seckill.order.dto.OrderListResponse;
+import com.seckill.order.service.OrderService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * 订单控制器
+ */
+@Tag(name = &quot;订单管理&quot;, description = &quot;订单相关接口&quot;)
+@Validated
+@RestController
+@RequestMapping(&quot;/api/order&quot;)
+<span class="nc" id="L25">@RequiredArgsConstructor</span>
+public class OrderController {
+
+    private final OrderService orderService;
+
+    /**
+     * 订单列表查询
+     */
+    @Operation(summary = &quot;订单列表&quot;, description = &quot;查询当前用户的订单列表，支持按状态筛选&quot;)
+    @GetMapping(&quot;/list&quot;)
+    public Result&lt;PageResult&lt;OrderListResponse&gt;&gt; list(
+            @Parameter(description = &quot;订单状态：1-待支付 2-已支付 3-已发货 4-已完成 5-已取消&quot;) @RequestParam(required = false) Integer status,
+            @Valid PageRequest pageRequest) {
+<span class="nc" id="L38">        PageResult&lt;OrderListResponse&gt; result = orderService.listUserOrders(</span>
+                status,
+<span class="nc" id="L40">                pageRequest.getCurrent(),</span>
+<span class="nc" id="L41">                pageRequest.getSize()</span>
+        );
+<span class="nc" id="L43">        return Result.success(result);</span>
+    }
+
+    /**
+     * 订单详情查询
+     */
+    @Operation(summary = &quot;订单详情&quot;, description = &quot;查询指定订单的详细信息&quot;)
+    @GetMapping(&quot;/{orderNo}&quot;)
+    public Result&lt;OrderDetailResponse&gt; detail(
+            @Parameter(description = &quot;订单编号&quot;, required = true) @NotBlank(message = &quot;订单编号不能为空&quot;)
+            @PathVariable String orderNo) {
+<span class="nc" id="L54">        OrderDetailResponse detail = orderService.getOrderDetail(orderNo);</span>
+<span class="nc" id="L55">        return Result.success(detail);</span>
+    }
+
+    /**
+     * 取消订单
+     */
+    @Operation(summary = &quot;取消订单&quot;, description = &quot;取消待支付的订单&quot;)
+    @PutMapping(&quot;/cancel/{orderNo}&quot;)
+    public Result&lt;Void&gt; cancel(
+            @Parameter(description = &quot;订单编号&quot;, required = true) @NotBlank(message = &quot;订单编号不能为空&quot;)
+            @PathVariable String orderNo,
+            @Parameter(description = &quot;取消原因&quot;) @RequestParam(required = false) String cancelReason) {
+<span class="nc" id="L67">        orderService.cancelOrder(orderNo, cancelReason);</span>
+<span class="nc" id="L68">        return Result.success();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -2,7 +2,10 @@
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-infrastructure/src/main/java/com/seckill/infrastructure/config/MyBatisPlusConfig.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-infrastructure/src/main/java/com/seckill/infrastructure/config/RabbitMQConfig.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-infrastructure/src/main/java/com/seckill/infrastructure/config/RedisConfig.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-infrastructure/src/main/java/com/seckill/infrastructure/config/SecurityBeanConfig.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-infrastructure/src/main/java/com/seckill/infrastructure/config/SecurityConfig.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-infrastructure/src/main/java/com/seckill/infrastructure/config/WebMvcConfig.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-infrastructure/src/main/java/com/seckill/infrastructure/interceptor/JwtAuthInterceptor.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-infrastructure/src/main/java/com/seckill/infrastructure/utils/RedisOperations.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-infrastructure/src/main/java/com/seckill/infrastructure/utils/RedisScriptExecutor.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-infrastructure/src/main/java/com/seckill/infrastructure/utils/RedisUtils.java

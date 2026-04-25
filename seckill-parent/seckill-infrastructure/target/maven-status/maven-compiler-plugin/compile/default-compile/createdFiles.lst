@@ -1,8 +1,11 @@
 com/seckill/infrastructure/config/MyBatisPlusConfig.class
-com/seckill/infrastructure/utils/RedisUtils.class
 com/seckill/infrastructure/interceptor/JwtAuthInterceptor.class
-com/seckill/infrastructure/config/Knife4jConfig.class
+com/seckill/infrastructure/utils/RedisOperations.class
 com/seckill/infrastructure/config/SecurityConfig.class
+com/seckill/infrastructure/utils/RedisScriptExecutor.class
+com/seckill/infrastructure/config/SecurityBeanConfig.class
+com/seckill/infrastructure/utils/RedisUtils.class
+com/seckill/infrastructure/config/Knife4jConfig.class
 com/seckill/infrastructure/config/MyBatisPlusConfig$1.class
 com/seckill/infrastructure/config/WebMvcConfig.class
 com/seckill/infrastructure/config/RedisConfig.class

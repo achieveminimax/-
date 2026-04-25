@@ -51,4 +51,10 @@ public interface AddressMapper extends BaseMapper<Address> {
      */
     @Update("UPDATE t_address SET is_default = 1 WHERE id = #{addressId} AND user_id = #{userId} AND deleted = 0")
     int setDefault(@Param("addressId") Long addressId, @Param("userId") Long userId);
+
+    /**
+     * 查询用户指定地址
+     */
+    @Select("SELECT * FROM t_address WHERE id = #{addressId} AND user_id = #{userId} AND deleted = 0 LIMIT 1")
+    Address selectOwnedAddress(@Param("userId") Long userId, @Param("addressId") Long addressId);
 }

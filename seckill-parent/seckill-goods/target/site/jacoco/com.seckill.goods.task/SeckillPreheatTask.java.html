@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SeckillPreheatTask.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">seckill-goods</a> &gt; <a href="index.source.html" class="el_package">com.seckill.goods.task</a> &gt; <span class="el_source">SeckillPreheatTask.java</span></div><h1>SeckillPreheatTask.java</h1><pre class="source lang-java linenums">package com.seckill.goods.task;
+
+import com.seckill.goods.service.SeckillPreheatService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+/**
+ * 秒杀预热定时任务。
+ * &lt;p&gt;
+ * 每分钟扫描一次即将开始的活动，并把活动详情和库存提前装载到 Redis。
+ */
+<span class="fc" id="L14">@Slf4j</span>
+@Component
+<span class="fc" id="L16">@RequiredArgsConstructor</span>
+public class SeckillPreheatTask {
+
+    /**
+     * 预热服务。
+     */
+    private final SeckillPreheatService seckillPreheatService;
+
+    /**
+     * 定时预热未来 5 分钟内的活动。
+     */
+    @Scheduled(cron = &quot;0 */1 * * * ?&quot;)
+    public void preheatUpcomingActivities() {
+<span class="fc" id="L29">        int count = seckillPreheatService.preheatUpcomingActivities();</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (count &gt; 0) {</span>
+<span class="fc" id="L31">            log.info(&quot;定时预热完成，预热活动数量={}&quot;, count);</span>
+        }
+<span class="fc" id="L33">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
