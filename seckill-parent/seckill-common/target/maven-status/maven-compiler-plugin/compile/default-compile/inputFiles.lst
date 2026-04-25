@@ -2,6 +2,7 @@
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/PageResult.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/ResponseCodeEnum.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/Result.java
+/Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/config/CommonConfig.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/constant/RedisKeyConstant.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/dto/PageRequest.java
 /Users/achieve/Documents/Trae_Projects/Projects/电商系统/seckill-parent/seckill-common/src/main/java/com/seckill/common/entity/BaseEntity.java

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.seckill.seckill.integration.SeckillIntegrationTest" time="0.003" tests="4" errors="0" skipped="4" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.seckill.seckill.integration.SeckillIntegrationTest" time="0.0" tests="4" errors="0" skipped="4" failures="0">
   <properties/>
   <testcase name="concurrentSeckill_100Users_100Stock" classname="com.seckill.seckill.integration.SeckillIntegrationTest" time="0.0">
     <skipped message="Integration test requires running Spring context with Redis/RabbitMQ/MySQL"/>

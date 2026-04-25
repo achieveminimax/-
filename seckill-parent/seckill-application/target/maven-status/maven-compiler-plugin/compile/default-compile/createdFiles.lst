@@ -1,2 +1,3 @@
+com/seckill/application/config/MybatisPlusConfig.class
 com/seckill/application/SeckillApplication.class
 com/seckill/application/controller/TestController.class

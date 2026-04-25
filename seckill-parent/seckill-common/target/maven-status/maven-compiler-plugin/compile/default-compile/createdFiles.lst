@@ -14,6 +14,7 @@ com/seckill/common/ResponseCodeEnum.class
 com/seckill/common/utils/JwtUtils.class
 com/seckill/common/PageRequest.class
 com/seckill/common/enums/SeckillRecordStatusEnum.class
+com/seckill/common/config/CommonConfig.class
 com/seckill/common/exception/GlobalExceptionHandler.class
 com/seckill/common/utils/JsonUtils.class
 com/seckill/common/result/PageResult.class
